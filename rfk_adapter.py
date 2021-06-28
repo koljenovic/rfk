@@ -49,28 +49,12 @@ class RFKAdapter:
                 result.append({field: self._prepare_value(record[field]) for field in fields})
         return result
 
-    def write(self, table):
-        # infer type information from field header
-        # CHAR = b'C' - check constraints
-        # CURRENCY = b'Y'
-        # DATE = b'D' - * ISO 8601 string 'YYYY-MM-DD' -> datetime
-        # DATETIME = b'T' - 2021-06-28T12:38:54Z
-        # DOUBLE = b'B'
-        # FLOAT = b'F'
-        # GENERAL = b'G'
-        # INTEGER = b'I'
-        # LOGICAL = b'L'
-        # MEMO = b'M'
-        # NUMERIC = b'N'
-        # PICTURE = b'P'
-        # TIMESTAMP = b'@'
-        # ValueError: unable to coerce <class 'int'>(20) to string
-        baza = dbf.Table('../data/ULIZ.DBF', codepage='cp852', dbf_type='db3')
-        baza.open(mode=dbf.READ_WRITE)
-        baza.append(sample)
-        baza.close()
+    def write(self, data):
+        """appends a new record to the table"""
+        self.table.append(data)
 
     def update(self, table):
+        # @TODO write failing test case first
         baza = dbf.Table('../data/ULIZ.DBF', codepage='cp852', dbf_type='db3')
         baza.open(mode=dbf.READ_WRITE)
         with baza[-1]:
@@ -79,22 +63,26 @@ class RFKAdapter:
 
 class RFKAdapterTest(TestCase):
     def __init__(self, *args, **kwds):
+        self._db_path = '../data/'
         super(RFKAdapterTest, self).__init__(*args, **kwds)
+
+    def _set_up(self, table_name='ULIZ.DBF', mode='r'): 
+        self._table = RFKAdapter(self._db_path, table_name, mode)
 
     def test_000_read_constructor(self):
         """test opening the table for reading"""
-        table = RFKAdapter('../data/', 'ULIZ.DBF')
-        self.assertEqual(table.table.status, dbf.READ_ONLY)
+        self._table = RFKAdapter(self._db_path, 'ULIZ.DBF')
+        self.assertEqual(self._table.table.status, dbf.READ_ONLY)
 
     def test_001_write_constructor(self):
         """test opening the table for reading"""
-        table = RFKAdapter('../data/', 'ULIZ.DBF', 'W')
-        self.assertEqual(table.table.status, dbf.READ_WRITE)
+        self._table = RFKAdapter(self._db_path, 'ULIZ.DBF', 'W')
+        self.assertEqual(self._table.table.status, dbf.READ_WRITE)
 
     def test_single_filtered_read(self):
         """test reading a single record filtered by a single condition"""
-        table = RFKAdapter('../data/', 'ULIZ.DBF')
-        result = table.read([('OTP_ULI', lambda x: x == '880')])
+        self._set_up()
+        result = self._table.read([('OTP_ULI', lambda x: x == '880')])
         self.assertEqual(result[0]['OTP_ULI'], '880')
         self.assertEqual(result[0]['OBJ_ULI'], '010')
         self.assertEqual(result[0]['DOK_ULI'], '20')
@@ -102,8 +90,8 @@ class RFKAdapterTest(TestCase):
 
     def test_multi_filtered_read(self):
         """test reading multiple record filtered by multiple conditions"""
-        table = RFKAdapter('../data/', 'ULIZ.DBF')
-        result = table.read([
+        self._set_up()
+        result = self._table.read([
             ('OBJ_ULI', lambda x: x == '010'),
             ('DOK_ULI', lambda x: x == '20'),
             ])
@@ -114,13 +102,31 @@ class RFKAdapterTest(TestCase):
 
     def test_missing_filter_key(self):
         """test raising a FieldError on missing field filter key"""
-        table = RFKAdapter('../data/', 'ULIZ.DBF')
-        self.assertRaises(FieldError, table.read, [('SOK_ULI', lambda x: True)])
+        self._set_up()
+        self.assertRaises(FieldError, self._table.read, [('SOK_ULI', lambda x: True)])
 
     def test_return_all(self):
         """return all the records with empty filter list"""
-        table = RFKAdapter('../data/', 'ULIZ.DBF')
-        self.assertGreater(len(table.read()), 0)
+        self._set_up()
+        self.assertGreater(len(self._table.read()), 0)
+
+    def test_appending_row(self):
+        """test appending a single row to the table"""
+        #@TODO: write more append test cases
+        self._set_up('ULIZ.DBF', 'W')
+        sample_row = {'OBJ_ULI': '010', 'DOK_ULI': '20', 'SIF_ULI': '00000', 'GOT_ULI': None, 'NAL_ULI': 'ADM', 'DAT_ULI': dbf.DateTime(2021, 6, 14), 'OTP_ULI': '225883', 'NAO_ULI': None, 'DAI_ULI': dbf.DateTime(2021, 6, 14), 'MIS_ULI': None, 'VAL_ULI': dbf.DateTime(2021, 6, 14), 'DAN_ULI': 0, 'RBR_ULI': 2, 'KUF_ULI': '1234', 'ZAD_ULI': '001', 'PAR_ULI': '0196552', 'PRO_ULI': None, 'TRG_ULI': None, 'KAS_ULI': 0, 'PUT_ULI': '001', 'NAP_ULI': '', 'LIK_ULI': None, 'FIN_ULI': None, 'L0_ULI': False, 'L1_ULI': False, 'L2_ULI': False, 'L3_ULI': False, 'L4_ULI': False, 'L5_ULI': False, 'L6_ULI': False, 'L7_ULI': False, 'L8_ULI': False, 'L9_ULI': False, 'L1A_ULI': None, 'L2A_ULI': None, 'L3A_ULI': None, 'L4A_ULI': None, 'L5A_ULI': None, 'N1_ULI': 0, 'N2_ULI': 0, 'FIS_ULI': None, 'REK_ULI': None, 'STO_ULI': None, 'FRA_ULI': None, 'FRR_ULI': None, 'MJE_ULI': None, 'PAS_ULI': None, 'DAS_ULI': None, 'MTR_ULI': None}
+        result = self._table.read([
+            ('OBJ_ULI', lambda x: x == '010'),
+            ('DOK_ULI', lambda x: x == '20'),
+            ])
+        fresh_row_id = str(max([int(record['SIF_ULI']) for record in result]) + 1).zfill(5)
+        sample_row['SIF_ULI'] = fresh_row_id
+        self._table.write(sample_row)
+        result = self._table.read([
+            ('OBJ_ULI', lambda x: x == '010'),
+            ('DOK_ULI', lambda x: x == '20'),
+            ])
+        self.assertEqual(result[-1]['SIF_ULI'], fresh_row_id)
 
 # '../data/ROBA.DBF'
 # '../data/ULIZ.DBF'
