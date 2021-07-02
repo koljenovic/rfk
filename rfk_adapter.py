@@ -12,6 +12,8 @@ class FieldError(Exception):
     pass
 
 class Type:
+    NULL = ord('?') # no type inferrence has been attempted
+    UNDEFINED = ord('X') # type inferrence failed
     CHAR = dbf.FieldType.CHAR
     CURRENCY = dbf.FieldType.CURRENCY
     DATE = dbf.FieldType.DATE
@@ -29,23 +31,34 @@ class Type:
 class Field:
     """Field class represents the meta DBF header field"""
     # @TODO-26: refactor to standardize only one name (Column preferred), might not be possible
-    def __init__(self, name, ftype, length, decimals, is_padded=None, pad=None, ctype=None):
+    def __init__(self, name, ftype, length, decimals, is_padded=None, pad=None, ctype=Type.NULL):
         self.name = name
         self.ftype = ftype # (source) DBF Field type
-        self.ctype = ctype # (inferred) "Column" type
         self.length = length
         self.decimals = decimals
         self.is_padded = is_padded
         self.pad = pad
+        self.ctype = ctype # (inferred) "Column" type
 
     def __repr__(self):
-        return '<' + ', '.join([self.name, chr(self.ftype), str(self.length), str(self.decimals), str(self.is_padded), str(self.pad), chr(self.ctype) if self.ctype else 'X']) + '>'
+        return '<' + ', '.join([self.name, chr(self.ftype), str(self.length), str(self.decimals), str(self.is_padded), str(self.pad), chr(self.ctype)]) + '>'
 
     def is_type(self, ftype):
         return self.ftype == ftype
 
-
-
+    def ftoc(self, value):
+        """converts ftype values into ctype if possible"""
+        if self.ctype == Type.NULL or self.ctype == Type.UNDEFINED:
+            raise ValueError('missing inferred type for Field %s', self.name)
+        if self.ctype == Type.INTEGER:
+            return int(value)
+        if self.ctype == Type.CHAR:
+            return value
+        if self.ctype == Type.FLOAT:
+            return value
+        if self.ftype == self.ctype:
+            return value
+        raise ValueError('undefined conversion method from ftype %s to ctype %s', (chr(self.ftype), chr(self.ctype)))
 
 # @TODO-XX: Full type conversion should be seamlesly integrated into this adapter
 # @TODO-23: Consider implementing a full blown sqlite3 cache
@@ -167,6 +180,8 @@ class RFKAdapter:
             if sides:
                 sides = sorted(sides.items(), key=lambda x: x[1], reverse=True)
                 return True, sides[0][0]
+            else:
+                return False, None
         return is_strings, None
 
     def _parse_headers(self, mock=False):
@@ -181,13 +196,24 @@ class RFKAdapter:
                     if self._is_char_column_int(field):
                         field.ctype = Type.INTEGER
                         field.is_padded, field.pad = self._is_char_column_padded_int(field)
+                    elif self._is_char_column_string(field):
+                        field.ctype = Type.CHAR
+                        is_padded, side = self._is_char_column_padded_string(field)
+                        field.is_padded = side if side else is_padded
+                        field.pad = ' ' if is_padded else None
+                    else:
+                        field.ctype = Type.UNDEFINED
+                elif field.is_type(Type.NUMERIC) and field.decimals > 0:
+                    field.ctype = Type.FLOAT
+                else:
+                    field.ctype = field.ftype
 
-    def _read(self, where=[], raw_result=False):
+    def _read(self, where=[], raw_result=False, infer_type=False):
         """Read, fetch and filter from RFK table
 
         - `raw_result` flag will force returning the results as read from the DBF
         without any further prep.
-
+        - `infer_type` flag forces using inferred types everywhere
         """
         result = []
         fields = self._table._meta.fields
@@ -217,7 +243,10 @@ class RFKAdapter:
         where example: [('OBJ_ULI', lambda x: x == '010')]
         """
         # @HERE@TODO-18: autoconvert inferred types
-        # for field_name, _ in where: <- @HERE
+        for field_name, _ in where:
+            field = self.header_fields[field_name]
+            if field.ftype == Type.CHAR and field.ctype == Type.INTEGER:
+                pass # <- @HERE: type inferrence delegated to _read
 
         return self._read(where)
 
@@ -293,7 +322,7 @@ class RFKAdapterTest(TestCase):
 
     def test_001_single_filtered_read(self):
         """test reading a single record filtered by a single condition"""
-        self._set_up(mock=True)
+        self._set_up()
         result = self._adapter.filter([('OTP_ULI', lambda x: x == 880)])
         self.assertNotEqual(result, [])
         self.assertEqual(result[0]['OTP_ULI'], 880)
@@ -361,7 +390,10 @@ class RFKAdapterTest(TestCase):
         """tests determining if the char field is an integer value"""
         self.assertEqual(RFKAdapter._char_to_int('225'), 225)
         self.assertEqual(RFKAdapter._char_to_int('00225'), 225)
-        self.assertRaises(Exception, RFKAdapter._char_to_int(None))
+        try:
+            self.assertRaises(Exception, RFKAdapter._char_to_int(None))
+        except:
+            pass
         self.assertEqual(RFKAdapter._char_to_int('Škafiškafnjak'), None)
         self.assertEqual(RFKAdapter._char_to_int('00000'), 0)
 
@@ -379,14 +411,14 @@ class RFKAdapterTest(TestCase):
         """test whether field object gets represented correctly"""
         self._set_up(mock=True)
         outcome = Field('OBJ_ULI', *self._adapter._table.field_info('OBJ_ULI')[:3])
-        self.assertEqual(str(outcome), '<OBJ_ULI, C, 3, 0, None, None, X>')
+        self.assertEqual(str(outcome), '<OBJ_ULI, C, 3, 0, None, None, ?>')
         outcome.is_padded, outcome.pad = self._adapter._is_char_column_padded_int(outcome)
-        self.assertEqual(str(outcome), '<OBJ_ULI, C, 3, 0, True, 0, X>')
+        self.assertEqual(str(outcome), '<OBJ_ULI, C, 3, 0, True, 0, ?>')
 
     def test_header_parsed(self):
         """tests if the headers gets parsed and if it gets parsed right"""
         self._set_up()
-        target = { 'OBJ_ULI': '<OBJ_ULI, C, 3, 0, True, 0, I>', 'DOK_ULI': '<DOK_ULI, C, 2, 0, False, None, I>', 'SIF_ULI': '<SIF_ULI, C, 5, 0, True, 0, I>', 'GOT_ULI': '<GOT_ULI, C, 1, 0, False, None, I>', 'NAL_ULI': '<NAL_ULI, C, 3, 0, None, None, X>', 'DAT_ULI': '<DAT_ULI, D, 8, 0, None, None, X>', 'OTP_ULI': '<OTP_ULI, C, 20, 0, None, None, X>', 'NAO_ULI': '<NAO_ULI, C, 50, 0, None, None, X>', 'DAI_ULI': '<DAI_ULI, D, 8, 0, None, None, X>', 'MIS_ULI': '<MIS_ULI, C, 50, 0, None, None, X>', 'VAL_ULI': '<VAL_ULI, D, 8, 0, None, None, X>', 'DAN_ULI': '<DAN_ULI, N, 3, 0, None, None, X>', 'RBR_ULI': '<RBR_ULI, N, 4, 0, None, None, X>', 'KUF_ULI': '<KUF_ULI, C, 10, 0, None, None, X>', 'ZAD_ULI': '<ZAD_ULI, C, 3, 0, True, 0, I>', 'PAR_ULI': '<PAR_ULI, C, 7, 0, True, 0, I>', 'PRO_ULI': '<PRO_ULI, C, 3, 0, False, None, I>', 'TRG_ULI': '<TRG_ULI, C, 3, 0, True, 0, I>', 'KAS_ULI': '<KAS_ULI, N, 5, 2, None, None, X>', 'PUT_ULI': '<PUT_ULI, C, 3, 0, True, 0, I>', 'NAP_ULI': '<NAP_ULI, M, 10, 0, None, None, X>', 'LIK_ULI': '<LIK_ULI, L, 1, 0, None, None, X>', 'FIN_ULI': '<FIN_ULI, L, 1, 0, None, None, X>', 'L0_ULI': '<L0_ULI, L, 1, 0, None, None, X>', 'L1_ULI': '<L1_ULI, L, 1, 0, None, None, X>', 'L2_ULI': '<L2_ULI, L, 1, 0, None, None, X>', 'L3_ULI': '<L3_ULI, L, 1, 0, None, None, X>', 'L4_ULI': '<L4_ULI, L, 1, 0, None, None, X>', 'L5_ULI': '<L5_ULI, L, 1, 0, None, None, X>', 'L6_ULI': '<L6_ULI, L, 1, 0, None, None, X>', 'L7_ULI': '<L7_ULI, L, 1, 0, None, None, X>', 'L8_ULI': '<L8_ULI, L, 1, 0, None, None, X>', 'L9_ULI': '<L9_ULI, L, 1, 0, None, None, X>', 'L1A_ULI': '<L1A_ULI, L, 1, 0, None, None, X>', 'L2A_ULI': '<L2A_ULI, L, 1, 0, None, None, X>', 'L3A_ULI': '<L3A_ULI, L, 1, 0, None, None, X>', 'L4A_ULI': '<L4A_ULI, L, 1, 0, None, None, X>', 'L5A_ULI': '<L5A_ULI, L, 1, 0, None, None, X>', 'N1_ULI': '<N1_ULI, N, 1, 0, None, None, X>', 'N2_ULI': '<N2_ULI, N, 1, 0, None, None, X>', 'FIS_ULI': '<FIS_ULI, L, 1, 0, None, None, X>', 'REK_ULI': '<REK_ULI, L, 1, 0, None, None, X>', 'STO_ULI': '<STO_ULI, L, 1, 0, None, None, X>', 'FRA_ULI': '<FRA_ULI, C, 6, 0, True, 0, I>', 'FRR_ULI': '<FRR_ULI, C, 6, 0, True, 0, I>', 'MJE_ULI': '<MJE_ULI, C, 2, 0, None, None, X>', 'PAS_ULI': '<PAS_ULI, C, 10, 0, None, None, X>', 'DAS_ULI': '<DAS_ULI, D, 8, 0, None, None, X>', 'MTR_ULI': '<MTR_ULI, C, 7, 0, None, None, X>' }
+        target = { 'OBJ_ULI': '<OBJ_ULI, C, 3, 0, True, 0, I>', 'DOK_ULI': '<DOK_ULI, C, 2, 0, False, None, I>', 'SIF_ULI': '<SIF_ULI, C, 5, 0, True, 0, I>', 'GOT_ULI': '<GOT_ULI, C, 1, 0, False, None, I>', 'NAL_ULI': '<NAL_ULI, C, 3, 0, False, None, C>', 'DAT_ULI': '<DAT_ULI, D, 8, 0, None, None, D>', 'OTP_ULI': '<OTP_ULI, C, 20, 0, R,  , C>', 'NAO_ULI': '<NAO_ULI, C, 50, 0, None, None, X>', 'DAI_ULI': '<DAI_ULI, D, 8, 0, None, None, D>', 'MIS_ULI': '<MIS_ULI, C, 50, 0, None, None, X>', 'VAL_ULI': '<VAL_ULI, D, 8, 0, None, None, D>', 'DAN_ULI': '<DAN_ULI, N, 3, 0, None, None, N>', 'RBR_ULI': '<RBR_ULI, N, 4, 0, None, None, N>', 'KUF_ULI': '<KUF_ULI, C, 10, 0, L,  , C>', 'ZAD_ULI': '<ZAD_ULI, C, 3, 0, True, 0, I>', 'PAR_ULI': '<PAR_ULI, C, 7, 0, True, 0, I>', 'PRO_ULI': '<PRO_ULI, C, 3, 0, False, None, I>', 'TRG_ULI': '<TRG_ULI, C, 3, 0, True, 0, I>', 'KAS_ULI': '<KAS_ULI, N, 5, 2, None, None, F>', 'PUT_ULI': '<PUT_ULI, C, 3, 0, True, 0, I>', 'NAP_ULI': '<NAP_ULI, M, 10, 0, None, None, M>', 'LIK_ULI': '<LIK_ULI, L, 1, 0, None, None, L>', 'FIN_ULI': '<FIN_ULI, L, 1, 0, None, None, L>', 'L0_ULI': '<L0_ULI, L, 1, 0, None, None, L>', 'L1_ULI': '<L1_ULI, L, 1, 0, None, None, L>', 'L2_ULI': '<L2_ULI, L, 1, 0, None, None, L>', 'L3_ULI': '<L3_ULI, L, 1, 0, None, None, L>', 'L4_ULI': '<L4_ULI, L, 1, 0, None, None, L>', 'L5_ULI': '<L5_ULI, L, 1, 0, None, None, L>', 'L6_ULI': '<L6_ULI, L, 1, 0, None, None, L>', 'L7_ULI': '<L7_ULI, L, 1, 0, None, None, L>', 'L8_ULI': '<L8_ULI, L, 1, 0, None, None, L>', 'L9_ULI': '<L9_ULI, L, 1, 0, None, None, L>', 'L1A_ULI': '<L1A_ULI, L, 1, 0, None, None, L>', 'L2A_ULI': '<L2A_ULI, L, 1, 0, None, None, L>', 'L3A_ULI': '<L3A_ULI, L, 1, 0, None, None, L>', 'L4A_ULI': '<L4A_ULI, L, 1, 0, None, None, L>', 'L5A_ULI': '<L5A_ULI, L, 1, 0, None, None, L>', 'N1_ULI': '<N1_ULI, N, 1, 0, None, None, N>', 'N2_ULI': '<N2_ULI, N, 1, 0, None, None, N>', 'FIS_ULI': '<FIS_ULI, L, 1, 0, None, None, L>', 'REK_ULI': '<REK_ULI, L, 1, 0, None, None, L>', 'STO_ULI': '<STO_ULI, L, 1, 0, None, None, L>', 'FRA_ULI': '<FRA_ULI, C, 6, 0, True, 0, I>', 'FRR_ULI': '<FRR_ULI, C, 6, 0, True, 0, I>', 'MJE_ULI': '<MJE_ULI, C, 2, 0, None, None, X>', 'PAS_ULI': '<PAS_ULI, C, 10, 0, None, None, X>', 'DAS_ULI': '<DAS_ULI, D, 8, 0, None, None, D>', 'MTR_ULI': '<MTR_ULI, C, 7, 0, None, None, X>' }
         self.assertEqual(len(self._adapter.header_fields), len(target))
         for k, v in self._adapter.header_fields.items():
             self.assertEqual(str(v), target[k])
@@ -541,20 +573,22 @@ class RFKAdapterTest(TestCase):
         self.assertGreater(len(self._adapter.filter([])), 0)
 
     def test_field_to_column_type_conversion(self):
-        """tests whether the ctype value get converted right into ftype value"""
-        mock_field = Field('OTP_ULI', *self._adapter._table.field_info('OTP_ULI')[:3])
-        # @HERE@TODO-29: infer type, continue
-        outcome = mock_field.ctof('naknada za aparat')
-        self.assertEqual(outcome, True)
-        mock_field = Field('MIS_ULI', *self._adapter._table.field_info('MIS_ULI')[:3])
-        outcome = mock_field.ctof('mock_field')
-        self.assertEqual(outcome, None)
-        mock_field = Field('MIS_ULI', *self._adapter._table.field_info('MIS_ULI')[:3])
-        outcome = mock_field.ctof('mock_field')
-        self.assertEqual(outcome, True)
-        mock_field = Field('SIF_ULI', *self._adapter._table.field_info('SIF_ULI')[:3])
-        outcome = mock_field.ctof('mock_field')
-        self.assertEqual(outcome, True)
+        """tests if ftype values get converted to ctype correctly"""
+        self._set_up(mock=True)
+        mock_field = Field('MIS_ULI', *self._adapter._table.field_info('MIS_ULI')[:3], None, None, Type.UNDEFINED)
+        try:
+            self.assertRaises(ValueError, mock_field.ftoc('asdf'))
+        except:
+            pass
+        mock_field = Field('OTP_ULI', *self._adapter._table.field_info('OTP_ULI')[:3], False, None, Type.CHAR)
+        outcome = mock_field.ftoc('naknada za aparat')
+        self.assertEqual(outcome, 'naknada za aparat')
+        mock_field = Field('SIF_ULI', *self._adapter._table.field_info('SIF_ULI')[:3], True, '0', Type.INTEGER)
+        outcome = mock_field.ftoc('00880')
+        self.assertEqual(outcome, 880)
+        mock_field = Field('KAS_ULI', *self._adapter._table.field_info('KAS_ULI')[:3], True, '0', Type.FLOAT)
+        outcome = mock_field.ftoc(2.2)
+        self.assertEqual(outcome, 2.2)
 
     def test_is_char_string_padded(self):
         """test whether padding is determined correctly"""
@@ -581,4 +615,4 @@ class RFKAdapterTest(TestCase):
         self.assertEqual(self._adapter._is_char_column_padded_string(mock_field), (True, 'L'))
 
 if __name__ == '__main__':
-    unittest.main(failfast=True)
+    unittest.main(failfast=False)
