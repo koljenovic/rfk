@@ -9,7 +9,7 @@ from six import string_types
 from unittest import TestCase
 from collections import defaultdict
 
-RUN_SLOW = False
+RUN_SLOW = True
 
 class FieldError(Exception):
     pass
@@ -33,7 +33,6 @@ class Type:
 
 class Field:
     """Field class represents the meta DBF header field"""
-    # @TODO-26: refactor to standardize only one name (Column preferred), might not be possible
     def __init__(self, name, ftype, length, decimals, is_padded=None, pad=None, ctype=Type.NULL):
         self.name = name
         self.ftype = ftype # (source) DBF Field type
@@ -64,7 +63,6 @@ class Field:
         raise ValueError('undefined conversion method from ftype %s to ctype %s', (chr(self.ftype), chr(self.ctype)))
 
 # @TODO-XX: Full type conversion should be seamlesly integrated into this adapter
-# @TODO-23: Consider implementing a full blown sqlite3 cache
 # @TODO-24: Determine mandatory fields
 class RFKAdapter:
     def __init__(self, db_path, table_name, mode='-', mock=False):
@@ -189,7 +187,6 @@ class RFKAdapter:
 
     def _parse_headers(self, mock=False):
         """Parses the fields from table headers"""
-        # @TODO-20: determine ctype padding for each ftype
         fields = self._table._meta.fields
         self.header_fields = { field: Field(field, *self._table.field_info(field)[:3]) for field in fields }
         if not mock:
@@ -656,10 +653,11 @@ class RFKAdapterSlowTest(RFKAdapterTest):
         json_path = os.path.join(self._adapter.db_path, base_name + '.json')
         self._adapter._cache_headers()
         self.assertEqual(os.path.isfile(json_path), True)
+        self._adapter._restore_headers()
         with open(json_path, 'r') as fp:
             headers = json.load(fp)
             for field_name, field_value in headers.items():
                 self.assertEqual(str(Field(**field_value)), str(self._adapter.header_fields[field_name]))
 
 if __name__ == '__main__':
-    unittest.main(failfast=True)
+    unittest.main(failfast=False)
