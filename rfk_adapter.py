@@ -4,9 +4,12 @@ import json
 import dbf
 import datetime
 import unittest
+import os
 from six import string_types
 from unittest import TestCase
 from collections import defaultdict
+
+RUN_SLOW = False
 
 class FieldError(Exception):
     pass
@@ -14,19 +17,19 @@ class FieldError(Exception):
 class Type:
     NULL = ord('?') # no type inferrence has been attempted
     UNDEFINED = ord('X') # type inferrence failed
-    CHAR = dbf.FieldType.CHAR
-    CURRENCY = dbf.FieldType.CURRENCY
-    DATE = dbf.FieldType.DATE
-    DATETIME = dbf.FieldType.DATETIME
-    DOUBLE = dbf.FieldType.DOUBLE
-    FLOAT = dbf.FieldType.FLOAT
-    GENERAL = dbf.FieldType.GENERAL
-    INTEGER = dbf.FieldType.INTEGER
-    LOGICAL = dbf.FieldType.LOGICAL
-    MEMO = dbf.FieldType.MEMO
-    NUMERIC = dbf.FieldType.NUMERIC
-    PICTURE = dbf.FieldType.PICTURE
-    TIMESTAMP = dbf.FieldType.TIMESTAMP
+    CHAR = int(dbf.FieldType.CHAR)
+    CURRENCY = int(dbf.FieldType.CURRENCY)
+    DATE = int(dbf.FieldType.DATE)
+    DATETIME = int(dbf.FieldType.DATETIME)
+    DOUBLE = int(dbf.FieldType.DOUBLE)
+    FLOAT = int(dbf.FieldType.FLOAT)
+    GENERAL = int(dbf.FieldType.GENERAL)
+    INTEGER = int(dbf.FieldType.INTEGER)
+    LOGICAL = int(dbf.FieldType.LOGICAL)
+    MEMO = int(dbf.FieldType.MEMO)
+    NUMERIC = int(dbf.FieldType.NUMERIC)
+    PICTURE = int(dbf.FieldType.PICTURE)
+    TIMESTAMP = int(dbf.FieldType.TIMESTAMP)
 
 class Field:
     """Field class represents the meta DBF header field"""
@@ -189,24 +192,28 @@ class RFKAdapter:
         # @TODO-20: determine ctype padding for each ftype
         fields = self._table._meta.fields
         self.header_fields = { field: Field(field, *self._table.field_info(field)[:3]) for field in fields }
-        # @TODO-22: persist header fields to sqlite3 cache, update on structural changes
         if not mock:
-            for field in self.header_fields.values():
-                if field.is_type(Type.CHAR):
-                    if self._is_char_column_int(field):
-                        field.ctype = Type.INTEGER
-                        field.is_padded, field.pad = self._is_char_column_padded_int(field)
-                    elif self._is_char_column_string(field):
-                        field.ctype = Type.CHAR
-                        is_padded, side = self._is_char_column_padded_string(field)
-                        field.is_padded = side if side else is_padded
-                        field.pad = ' ' if is_padded else None
+            base_name = os.path.splitext(self.table_name)[0]
+            cache_path = os.path.join(self.db_path, base_name + '.json')
+            if os.path.isfile(cache_path):
+                self._restore_headers()
+            else:
+                for field in self.header_fields.values():
+                    if field.is_type(Type.CHAR):
+                        if self._is_char_column_int(field):
+                            field.ctype = Type.INTEGER
+                            field.is_padded, field.pad = self._is_char_column_padded_int(field)
+                        elif self._is_char_column_string(field):
+                            field.ctype = Type.CHAR
+                            is_padded, side = self._is_char_column_padded_string(field)
+                            field.is_padded = side if side else is_padded
+                            field.pad = ' ' if is_padded else None
+                        else:
+                            field.ctype = Type.UNDEFINED
+                    elif field.is_type(Type.NUMERIC) and field.decimals > 0:
+                        field.ctype = Type.FLOAT
                     else:
-                        field.ctype = Type.UNDEFINED
-                elif field.is_type(Type.NUMERIC) and field.decimals > 0:
-                    field.ctype = Type.FLOAT
-                else:
-                    field.ctype = field.ftype
+                        field.ctype = field.ftype
 
     def _read(self, where=[], raw_result=False, infer_type=False):
         """Read, fetch and filter from RFK table
@@ -252,18 +259,21 @@ class RFKAdapter:
     def filter(self, where=[]):
         """Returns all filtered DBF values, best effort type inferred
 
-        where example: [('OBJ_ULI', lambda x: x == '010')]
+        where e.g. [('OBJ_ULI', lambda x: x == '010')]
         """
         return self._read(where, infer_type=True)
 
     def write(self, data):
         """Appends a new record to the table"""
-        # @TODO: treba paddovati C intove?
+        # @TODO: treba paddovati C intove
+            # - ukoliko je ftype C i ctype I padovati padom
+            # - ukoliko je i ftype i ctype C padovati sa \w
+            # - paddovati sve kako je u izvorniku
+            # - uvijek provjera da li je padding dobar
+            # - strip args po default pa padovati?
         # @TODO: konvertuj datume iz ISO8601
+            # ako je ftype D a argument string, konvertovati po ISO8601 formatu
         # @TODO: da li je dobar encoding upisa?
-        # @HERE@TODO-19: paddovati sve kako je u izvorniku
-        # @TODO: uvijek provjera da li je padding dobar, mozda strip po default pa padovati
-        # @TODO: string format datuma
         self._table.append(data)
 
     def update(self, table):
@@ -272,6 +282,27 @@ class RFKAdapter:
         with baza[-1]:
             baza[-1]['KUF_ULI'] = '4322'
         baza.close()
+
+    def _cache_headers(self):
+        """Caches parsed headers to file because parsing is time demanding
+
+        @TODO-XX: update cache on structural changes, ATM this is unneccessary,
+        flush manually by deleting *.json
+        """
+        base_name = os.path.splitext(self.table_name)[0]
+        json_path = os.path.join(self.db_path, base_name + '.json')
+        with open(json_path, 'w') as fp:
+            headers = { field.name: field.__dict__ for field in self.header_fields.values() }
+            json.dump(headers, fp)
+
+    def _restore_headers(self):
+        """Restores header fields from cache"""
+        base_name = os.path.splitext(self.table_name)[0]
+        json_path = os.path.join(self.db_path, base_name + '.json')
+        with open(json_path, 'r') as fp:
+            headers = json.load(fp)
+            for field_name, field in headers.items():
+                self.header_fields[field_name] = Field(**field)
 
 class RFKAdapterTest(TestCase):
     def __init__(self, *args, **kwds):
@@ -311,19 +342,6 @@ class RFKAdapterTest(TestCase):
         result = self._adapter._read([('SIF_ULI', lambda x: x == '00911')])
         self.assertNotEqual(result, [])
         self.assertEqual(result[0]['SIF_ULI'], '00911')
-
-    # def test_000(self):
-        # self._set_up(mock=True)
-        # result00 = self._adapter._read([
-        #     ('SIF_ULI', lambda x: x == '00745'),
-        #     ('DOK_ULI', lambda x: x == '20'),
-        #     ], raw_result=True)
-        # result01 = self._adapter._read([
-        #     ('SIF_ULI', lambda x: x == '01010'),
-        #     ('DOK_ULI', lambda x: x == '20'),
-        #     ], raw_result=True)
-        # for field in self._adapter.header_fields.values():
-        #     print('T' if result00[0][field.name] == result01[0][field.name] else 'F', field.name, '<', result00[0][field.name], '|', result01[0][field.name], '>')
 
     def test_single_filtered_read(self):
         """test reading a single record filtered by a single condition"""
@@ -621,6 +639,27 @@ class RFKAdapterTest(TestCase):
         self.assertEqual(self._adapter._is_char_column_padded_string(mock_field), (True, 'R'))
         mock_field = Field('KUF_ULI', *self._adapter._table.field_info('KUF_ULI')[:3])
         self.assertEqual(self._adapter._is_char_column_padded_string(mock_field), (True, 'L'))
+
+    def test_source_header_signature_change_detection(self):
+        """test whether header signature change gets registered"""
+        self.assertEqual(False, True)
+
+class RFKAdapterSlowTest(RFKAdapterTest):
+    def __init__(self, *args, **kwds):
+        super(RFKAdapterSlowTest, self).__init__(*args, **kwds)
+
+    @unittest.skipUnless(RUN_SLOW, "slow")
+    def test_json_caching_and_restoring_parsed_headers(self):
+        """tests whether header Field objects get cached and restored correctly"""
+        self._set_up()
+        base_name = os.path.splitext(self._adapter.table_name)[0]
+        json_path = os.path.join(self._adapter.db_path, base_name + '.json')
+        self._adapter._cache_headers()
+        self.assertEqual(os.path.isfile(json_path), True)
+        with open(json_path, 'r') as fp:
+            headers = json.load(fp)
+            for field_name, field_value in headers.items():
+                self.assertEqual(str(Field(**field_value)), str(self._adapter.header_fields[field_name]))
 
 if __name__ == '__main__':
     unittest.main(failfast=True)
