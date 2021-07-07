@@ -8,6 +8,7 @@ import os
 from six import string_types
 from unittest import TestCase
 from collections import defaultdict
+from datetime import date
 
 RUN_SLOW = True
 
@@ -260,17 +261,37 @@ class RFKAdapter:
         """
         return self._read(where, infer_type=True)
 
+    def _pad(self, value, length, pad=' ', side='L'):
+        if len(value) >= length:
+            return value
+        if side == 'L' or side == True:
+            return pad * (length - len(value)) + value
+        elif side == 'R':
+            return value + pad * (length - len(value))
+        raise Exception('Undefined padding side %s.', side)
+
     def write(self, data):
         """Appends a new record to the table"""
-        # @TODO: treba paddovati C intove
-            # - ukoliko je ftype C i ctype I padovati padom
-            # - ukoliko je i ftype i ctype C padovati sa \w
+        # @HERE@TODO: treba paddovati C intove
+            # - ukoliko je ftype C i ctype I padovati padom - DONE
+            # - ukoliko je i ftype i ctype C padovati sa \w 
             # - paddovati sve kako je u izvorniku
             # - uvijek provjera da li je padding dobar
             # - strip args po default pa padovati?
-        # @TODO: konvertuj datume iz ISO8601
-            # ako je ftype D a argument string, konvertovati po ISO8601 formatu
-        # @TODO: da li je dobar encoding upisa?
+        # @TODO: konvertuj datume iz ISO8601 - DONE
+            # ako je ftype D a argument string, konvertovati po ISO8601 formatu  - DONE
+        for k, v in data.items():
+            field = self.header_fields[k]
+            if field.ftype == Type.CHAR:
+                if field.ctype == Type.INTEGER:
+                    if isinstance(v, int):
+                        if field.is_padded:
+                            data[k] = self._pad(str(v), field.length, field.pad, field.is_padded)
+                        else:
+                            data[k] = str(v)
+            if self.header_fields[k].ftype == Type.DATE:
+                if isinstance(v, string_types):
+                    data[k] = date.fromisoformat(v)
         self._table.append(data)
 
     def update(self, table):
@@ -531,10 +552,10 @@ class RFKAdapterTest(TestCase):
         self.assertEqual(outcome[0], False)
         self.assertEqual(outcome[1], None)
 
-    def test_001_appending_mixed_types_record(self):
+    def test_appending_mixed_types_record(self):
         """test appending a mismatched types record to the table"""
         self._set_up('ULIZ.DBF', 'W')
-        sample_record = {'OBJ_ULI': 10, 'DOK_ULI': 20, 'SIF_ULI': 0, 'GOT_ULI': None, 'NAL_ULI': 'ADM', 'DAT_ULI': dbf.DateTime(2021, 6, 14), 'OTP_ULI': '225883', 'NAO_ULI': None, 'DAI_ULI': '2021-06-14', 'MIS_ULI': None, 'VAL_ULI': dbf.DateTime(2021, 6, 14), 'DAN_ULI': 0, 'RBR_ULI': 2, 'KUF_ULI': '1234', 'ZAD_ULI': '001', 'PAR_ULI': '0196552', 'PRO_ULI': None, 'TRG_ULI': None, 'KAS_ULI': 0, 'PUT_ULI': '001', 'NAP_ULI': '', 'LIK_ULI': None, 'FIN_ULI': None, 'L0_ULI': False, 'L1_ULI': False, 'L2_ULI': False, 'L3_ULI': False, 'L4_ULI': False, 'L5_ULI': False, 'L6_ULI': False, 'L7_ULI': False, 'L8_ULI': False, 'L9_ULI': False, 'L1A_ULI': None, 'L2A_ULI': None, 'L3A_ULI': None, 'L4A_ULI': None, 'L5A_ULI': None, 'N1_ULI': 0, 'N2_ULI': 0, 'FIS_ULI': None, 'REK_ULI': None, 'STO_ULI': None, 'FRA_ULI': None, 'FRR_ULI': None, 'MJE_ULI': None, 'PAS_ULI': None, 'DAS_ULI': None, 'MTR_ULI': None}
+        sample_record = {'OBJ_ULI': 10, 'DOK_ULI': 20, 'SIF_ULI': 0, 'GOT_ULI': None, 'NAL_ULI': 'ADM', 'DAT_ULI': '2021-07-07', 'OTP_ULI': '225883', 'NAO_ULI': None, 'DAI_ULI': '2021-06-14', 'MIS_ULI': None, 'VAL_ULI': dbf.DateTime(2021, 6, 14), 'DAN_ULI': 0, 'RBR_ULI': 2, 'KUF_ULI': '1234', 'ZAD_ULI': '001', 'PAR_ULI': '0196552', 'PRO_ULI': None, 'TRG_ULI': None, 'KAS_ULI': 0, 'PUT_ULI': '001', 'NAP_ULI': '', 'LIK_ULI': None, 'FIN_ULI': None, 'L0_ULI': False, 'L1_ULI': False, 'L2_ULI': False, 'L3_ULI': False, 'L4_ULI': False, 'L5_ULI': False, 'L6_ULI': False, 'L7_ULI': False, 'L8_ULI': False, 'L9_ULI': False, 'L1A_ULI': None, 'L2A_ULI': None, 'L3A_ULI': None, 'L4A_ULI': None, 'L5A_ULI': None, 'N1_ULI': 0, 'N2_ULI': 0, 'FIS_ULI': None, 'REK_ULI': None, 'STO_ULI': None, 'FRA_ULI': None, 'FRR_ULI': None, 'MJE_ULI': None, 'PAS_ULI': None, 'DAS_ULI': None, 'MTR_ULI': None}
         result = self._adapter._read([
             ('OBJ_ULI', lambda x: x == '010'),
             ('DOK_ULI', lambda x: x == '20'),
@@ -637,9 +658,15 @@ class RFKAdapterTest(TestCase):
         mock_field = Field('KUF_ULI', *self._adapter._table.field_info('KUF_ULI')[:3])
         self.assertEqual(self._adapter._is_char_column_padded_string(mock_field), (True, 'L'))
 
-    def test_source_header_signature_change_detection(self):
-        """test whether header signature change gets registered"""
-        self.assertEqual(False, True)
+    def test_padding(self):
+        self._set_up(mock=True)
+        self.assertEqual(self._adapter._pad('256', 8), '     256')
+        self.assertEqual(self._adapter._pad(' 256 ', 8), '    256 ')
+        self.assertEqual(self._adapter._pad('256', 8, ' ', 'L'), '     256')
+        self.assertEqual(self._adapter._pad('', 8), '        ')
+        self.assertEqual(self._adapter._pad('225', 6, ' ', 'R'), '225   ')
+        self.assertEqual(self._adapter._pad('225', 6, '0'), '000225')
+        self.assertEqual(self._adapter._pad('225', 6, '0', True), '000225')
 
 class RFKAdapterSlowTest(RFKAdapterTest):
     def __init__(self, *args, **kwds):
@@ -660,4 +687,4 @@ class RFKAdapterSlowTest(RFKAdapterTest):
                 self.assertEqual(str(Field(**field_value)), str(self._adapter.header_fields[field_name]))
 
 if __name__ == '__main__':
-    unittest.main(failfast=False)
+    unittest.main(failfast=True)
