@@ -38,6 +38,7 @@ import dbf
 import datetime
 import unittest
 import os
+import secrets
 from six import string_types
 from unittest import TestCase
 from collections import defaultdict
@@ -82,6 +83,18 @@ class Field:
     def is_type(self, ftype):
         return self.ftype == ftype
 
+    def _pad(self, value, length=None, pad=None, side=None):
+        length = self.length if not length else length
+        pad = self.pad if not pad else pad
+        side = self.is_padded if not side else side
+        if len(value) >= length:
+            return value
+        if side == 'L' or side == True:
+            return pad * (length - len(value)) + value
+        elif side == 'R':
+            return value + pad * (length - len(value))
+        raise Exception('Undefined padding side %s.', side)
+
     def ftoc(self, value):
         """converts ftype values into ctype if possible"""
         if self.ctype == Type.NULL or self.ctype == Type.UNDEFINED:
@@ -92,9 +105,28 @@ class Field:
             return value
         if self.ctype == Type.FLOAT:
             return value
+        if self.ftype == Type.DATE:
+            return value.isoformat() if value else value
         if self.ftype == self.ctype:
             return value
         raise ValueError('undefined conversion method from ftype %s to ctype %s', (chr(self.ftype), chr(self.ctype)))
+
+    def ctof(self, value):
+        """converst ctype values back into native ftype with padding and all"""
+        if self.ftype == Type.CHAR:
+            if self.ctype == Type.INTEGER:
+                if isinstance(value, int):
+                    if self.is_padded:
+                        return self._pad(str(value))
+                    else:
+                        return str(value)
+            elif self.ctype == Type.CHAR:
+                if self.is_padded and isinstance(value, string_types):
+                    return self._pad(value)
+        if self.ftype == Type.DATE:
+            if isinstance(value, string_types):
+                return date.fromisoformat(value)
+        return value
 
 # @TODO-EP-002: Determine mandatory header fields
 class RFKAdapter:
@@ -292,40 +324,31 @@ class RFKAdapter:
         """
         return self._read(where, infer_type=True)
 
-    def _pad(self, value, length, pad=' ', side='L'):
-        if len(value) >= length:
-            return value
-        if side == 'L' or side == True:
-            return pad * (length - len(value)) + value
-        elif side == 'R':
-            return value + pad * (length - len(value))
-        raise Exception('Undefined padding side %s.', side)
-
     def write(self, data):
         """Appends a new record to the table"""
         for k, v in data.items():
-            field = self.header_fields[k]
-            if field.ftype == Type.CHAR:
-                if field.ctype == Type.INTEGER:
-                    if isinstance(v, int):
-                        if field.is_padded:
-                            data[k] = self._pad(str(v), field.length, field.pad, field.is_padded)
-                        else:
-                            data[k] = str(v)
-                elif field.ctype == Type.CHAR:
-                    if field.is_padded and isinstance(v, string_types):
-                        data[k] = self._pad(v, field.length, field.pad, field.is_padded)
-            if self.header_fields[k].ftype == Type.DATE:
-                if isinstance(v, string_types):
-                    data[k] = date.fromisoformat(v)
+            data[k] = self.header_fields[k].ctof(v)
         self._table.append(data)
 
-    def update(self, table):
-        baza = dbf.Table('../data/ULIZ.DBF', codepage='cp852', dbf_type='db3')
-        baza.open(mode=dbf.READ_WRITE)
-        with baza[-1]:
-            baza[-1]['KUF_ULI'] = '4322'
-        baza.close()
+    def update(self, what, where):
+        """Updates existing records"""
+        fields = self._table._meta.fields
+        for field_name, constr in where:
+            if field_name not in fields:
+                raise FieldError('No field with name %s in table %s', (field_name, self.table_name))
+        for record in self._table:
+            satisfies = True
+            for field_name, constr in where:
+                value = RFKAdapter._prepare_value(record[field_name])
+                value = self.header_fields[field_name].ftoc(value)
+                if not constr(value):
+                    satisfies = False
+                    break
+            if satisfies:
+                for k, v in what.items():
+                    with record:
+                        record[k] = self.header_fields[k].ctof(v)
+        return True
 
     def _cache_headers(self):
         """Caches parsed headers to file because parsing is time demanding
@@ -609,12 +632,31 @@ class RFKAdapterTest(TestCase):
                 else:
                     self.assertEqual(bool(v), bool(result[-1][k].strip()))
 
-    def test_updating_single_record(self):
+    def test_001_updating_single_record(self):
         """tests updating a single existing record"""
-        self.assertEqual(False, True)
+        # @HERE@TODO-012
+        self._set_up('ULIZ.DBF', 'W')
+        today = datetime.date.today().isoformat()
+        randval = str(secrets.randbelow(10**6))
+        success = self._adapter.update(
+            { 'DAT_ULI': today, 'KUF_ULI': randval},
+            [('OBJ_ULI', lambda x: x == 10),
+            ('DOK_ULI', lambda x: x == 20),
+            ('SIF_ULI', lambda x: x == 915),
+            ])
+        self.assertEqual(success, True)
+        outcome = self._adapter.filter([
+            ('OBJ_ULI', lambda x: x == 10),
+            ('DOK_ULI', lambda x: x == 20),
+            ('SIF_ULI', lambda x: x == 915),
+            ])
+        self.assertNotEqual(outcome, [])
+        self.assertEqual(outcome[-1]['DAT_ULI'], today)
+        self.assertEqual(outcome[-1]['KUF_ULI'], randval)
 
-    def test_updating_multiple_records(self):
+    def test_002_updating_multiple_records(self):
         """tests updating multiple records by a certain criteria"""
+        # @TODO-32: write test case
         self.assertEqual(False, True)
 
     def test_is_char_column_string(self):
@@ -699,14 +741,21 @@ class RFKAdapterTest(TestCase):
         self.assertEqual(self._adapter._is_char_column_padded_string(mock_field), (True, 'L'))
 
     def test_padding(self):
+        mock_field = Field('MOCK_ULI', Type.CHAR, 10, 0, 'L', ' ', Type.CHAR)
+        self.assertEqual(mock_field._pad('ASDF'), '      ASDF')
+        self.assertEqual(mock_field._pad('256', 8), '     256')
+        self.assertEqual(mock_field._pad(' 256 ', 8), '    256 ')
+        self.assertEqual(mock_field._pad('256', 8, ' ', 'L'), '     256')
+        self.assertEqual(mock_field._pad('', 8), '        ')
+        self.assertEqual(mock_field._pad('225', 6, ' ', 'R'), '225   ')
+        self.assertEqual(mock_field._pad('225', 6, '0'), '000225')
+        self.assertEqual(mock_field._pad('225', 6, '0', True), '000225')
+
+    def test_column_to_field_type_conversion(self):
+        """tests if ctype values get converted to native padded ftype correctly"""
         self._set_up()
-        self.assertEqual(self._adapter._pad('256', 8), '     256')
-        self.assertEqual(self._adapter._pad(' 256 ', 8), '    256 ')
-        self.assertEqual(self._adapter._pad('256', 8, ' ', 'L'), '     256')
-        self.assertEqual(self._adapter._pad('', 8), '        ')
-        self.assertEqual(self._adapter._pad('225', 6, ' ', 'R'), '225   ')
-        self.assertEqual(self._adapter._pad('225', 6, '0'), '000225')
-        self.assertEqual(self._adapter._pad('225', 6, '0', True), '000225')
+        self.assertEqual(False, True)
+        # @TODO-31: write tests, mirror ftoc test case with adjustments
 
 class RFKAdapterSlowTest(RFKAdapterTest):
     def __init__(self, *args, **kwds):
@@ -727,4 +776,4 @@ class RFKAdapterSlowTest(RFKAdapterTest):
                 self.assertEqual(str(Field(**field_value)), str(self._adapter.header_fields[field_name]))
 
 if __name__ == '__main__':
-    unittest.main(failfast=True)
+    unittest.main(failfast=False)
