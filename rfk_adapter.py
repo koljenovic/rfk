@@ -1,5 +1,38 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+"""
+=========
+Copyright
+=========
+
+    - Copyright: 2021 MEKOM d.o.o. Visoko -- All rights reserved.
+    - Author: Malik Koljenović
+    - Contact: malik@mekom.ba
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    - Neither the name of MEKOM d.o.o. Visoko nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED ''AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+"""
+
 import json
 import dbf
 import datetime
@@ -289,6 +322,9 @@ class RFKAdapter:
                             data[k] = self._pad(str(v), field.length, field.pad, field.is_padded)
                         else:
                             data[k] = str(v)
+                elif field.ctype == Type.CHAR:
+                    if field.is_padded and isinstance(v, string_types):
+                        data[k] = self._pad(v, field.length, field.pad, field.is_padded)
             if self.header_fields[k].ftype == Type.DATE:
                 if isinstance(v, string_types):
                     data[k] = date.fromisoformat(v)
@@ -357,9 +393,9 @@ class RFKAdapterTest(TestCase):
         self.assertEqual(result[0]['OBJ_ULI'], '010')
         self.assertEqual(result[0]['DOK_ULI'], '20')
         self.assertEqual(result[0]['SIF_ULI'], '00881')
-        result = self._adapter._read([('SIF_ULI', lambda x: x == '00911')])
+        result = self._adapter._read([('SIF_ULI', lambda x: x == '00870')])
         self.assertNotEqual(result, [])
-        self.assertEqual(result[0]['SIF_ULI'], '00911')
+        self.assertEqual(result[0]['SIF_ULI'], '00870')
 
     def test_single_filtered_read(self):
         """test reading a single record filtered by a single condition"""
@@ -370,9 +406,9 @@ class RFKAdapterTest(TestCase):
         self.assertEqual(result[0]['OBJ_ULI'], 10)
         self.assertEqual(result[0]['DOK_ULI'], 20)
         self.assertEqual(result[0]['SIF_ULI'], 876)
-        result = self._adapter.filter([('SIF_ULI', lambda x: x == 911)])
+        result = self._adapter.filter([('SIF_ULI', lambda x: x == 870)])
         self.assertNotEqual(result, [])
-        self.assertEqual(result[0]['SIF_ULI'], 911)
+        self.assertEqual(result[0]['SIF_ULI'], 870)
 
     def test_single_filtered_internal_raw_read(self):
         """test _reading a single raw record filtered by a single condition"""
@@ -552,7 +588,7 @@ class RFKAdapterTest(TestCase):
         self.assertEqual(outcome[0], False)
         self.assertEqual(outcome[1], None)
 
-    def test_appending_mixed_types_record(self):
+    def test_000_appending_mixed_types_record(self):
         """test appending a mismatched types record to the table"""
         self._set_up('ULIZ.DBF', 'W')
         sample_record = {'OBJ_ULI': 10, 'DOK_ULI': 20, 'SIF_ULI': 0, 'GOT_ULI': None, 'NAL_ULI': 'ADM', 'DAT_ULI': '2021-07-07', 'OTP_ULI': '225883', 'NAO_ULI': None, 'DAI_ULI': '2021-06-14', 'MIS_ULI': None, 'VAL_ULI': dbf.DateTime(2021, 6, 14), 'DAN_ULI': 0, 'RBR_ULI': 2, 'KUF_ULI': '1234', 'ZAD_ULI': '001', 'PAR_ULI': '0196552', 'PRO_ULI': None, 'TRG_ULI': None, 'KAS_ULI': 0, 'PUT_ULI': '001', 'NAP_ULI': '', 'LIK_ULI': None, 'FIN_ULI': None, 'L0_ULI': False, 'L1_ULI': False, 'L2_ULI': False, 'L3_ULI': False, 'L4_ULI': False, 'L5_ULI': False, 'L6_ULI': False, 'L7_ULI': False, 'L8_ULI': False, 'L9_ULI': False, 'L1A_ULI': None, 'L2A_ULI': None, 'L3A_ULI': None, 'L4A_ULI': None, 'L5A_ULI': None, 'N1_ULI': 0, 'N2_ULI': 0, 'FIS_ULI': None, 'REK_ULI': None, 'STO_ULI': None, 'FRA_ULI': None, 'FRR_ULI': None, 'MJE_ULI': None, 'PAS_ULI': None, 'DAS_ULI': None, 'MTR_ULI': None}
@@ -566,8 +602,15 @@ class RFKAdapterTest(TestCase):
         result = self._adapter._read([
             ('OBJ_ULI', lambda x: x == '010'),
             ('DOK_ULI', lambda x: x == '20'),
-            ])
+            ], raw_result=True)
         self.assertEqual(result[-1]['SIF_ULI'], fresh_row_id)
+        for k, v in sample_record.items():
+            field = self._adapter.header_fields[k]
+            if field.ftype == Type.CHAR:
+                if v:
+                    self.assertEqual(v, result[-1][k])
+                else:
+                    self.assertEqual(bool(v), bool(result[-1][k].strip()))
 
     # def test_updating_single_record(self):
     #     """tests updating a single existing record"""
