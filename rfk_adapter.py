@@ -96,15 +96,14 @@ class Field:
             return value
         raise ValueError('undefined conversion method from ftype %s to ctype %s', (chr(self.ftype), chr(self.ctype)))
 
-# @TODO-XX: Full type conversion should be seamlesly integrated into this adapter
-# @TODO-24: Determine mandatory fields
+# @TODO-EP-002: Determine mandatory header fields
 class RFKAdapter:
-    def __init__(self, db_path, table_name, mode='-', mock=False):
+    def __init__(self, db_path, table_name, mode='-'):
         self.db_path = db_path
         self.table_name = table_name
         self._table = dbf.Table(db_path + table_name, codepage='cp852', dbf_type='db3')
         self._table.open(mode=dbf.READ_WRITE if mode.lower() == 'w' else dbf.READ_ONLY)
-        self._parse_headers(mock)
+        self._parse_headers()
 
     def __del__(self):
         if hasattr(self, '_table') and self._table.status != dbf.CLOSED:
@@ -219,32 +218,31 @@ class RFKAdapter:
                 return False, None
         return is_strings, None
 
-    def _parse_headers(self, mock=False):
+    def _parse_headers(self):
         """Parses the fields from table headers"""
         fields = self._table._meta.fields
         self.header_fields = { field: Field(field, *self._table.field_info(field)[:3]) for field in fields }
-        if not mock:
-            base_name = os.path.splitext(self.table_name)[0]
-            cache_path = os.path.join(self.db_path, base_name + '.json')
-            if os.path.isfile(cache_path):
-                self._restore_headers()
-            else:
-                for field in self.header_fields.values():
-                    if field.is_type(Type.CHAR):
-                        if self._is_char_column_int(field):
-                            field.ctype = Type.INTEGER
-                            field.is_padded, field.pad = self._is_char_column_padded_int(field)
-                        elif self._is_char_column_string(field):
-                            field.ctype = Type.CHAR
-                            is_padded, side = self._is_char_column_padded_string(field)
-                            field.is_padded = side if side else is_padded
-                            field.pad = ' ' if is_padded else None
-                        else:
-                            field.ctype = Type.UNDEFINED
-                    elif field.is_type(Type.NUMERIC) and field.decimals > 0:
-                        field.ctype = Type.FLOAT
+        base_name = os.path.splitext(self.table_name)[0]
+        cache_path = os.path.join(self.db_path, base_name + '.json')
+        if os.path.isfile(cache_path):
+            self._restore_headers()
+        else:
+            for field in self.header_fields.values():
+                if field.is_type(Type.CHAR):
+                    if self._is_char_column_int(field):
+                        field.ctype = Type.INTEGER
+                        field.is_padded, field.pad = self._is_char_column_padded_int(field)
+                    elif self._is_char_column_string(field):
+                        field.ctype = Type.CHAR
+                        is_padded, side = self._is_char_column_padded_string(field)
+                        field.is_padded = side if side else is_padded
+                        field.pad = ' ' if is_padded else None
                     else:
-                        field.ctype = field.ftype
+                        field.ctype = Type.UNDEFINED
+                elif field.is_type(Type.NUMERIC) and field.decimals > 0:
+                    field.ctype = Type.FLOAT
+                else:
+                    field.ctype = field.ftype
 
     def _read(self, where=[], raw_result=False, infer_type=False):
         """Read, fetch and filter from RFK table
@@ -305,14 +303,6 @@ class RFKAdapter:
 
     def write(self, data):
         """Appends a new record to the table"""
-        # @HERE@TODO: treba paddovati C intove
-            # - ukoliko je ftype C i ctype I padovati padom - DONE
-            # - ukoliko je i ftype i ctype C padovati sa \w 
-            # - paddovati sve kako je u izvorniku
-            # - uvijek provjera da li je padding dobar
-            # - strip args po default pa padovati?
-        # @TODO: konvertuj datume iz ISO8601 - DONE
-            # ako je ftype D a argument string, konvertovati po ISO8601 formatu  - DONE
         for k, v in data.items():
             field = self.header_fields[k]
             if field.ftype == Type.CHAR:
@@ -340,7 +330,7 @@ class RFKAdapter:
     def _cache_headers(self):
         """Caches parsed headers to file because parsing is time demanding
 
-        @TODO-XX: update cache on structural changes, ATM this is unneccessary,
+        @TODO-EP-001: update cache on structural changes, ATM this is unneccessary,
         flush manually by deleting *.json
         """
         base_name = os.path.splitext(self.table_name)[0]
@@ -363,17 +353,17 @@ class RFKAdapterTest(TestCase):
         self._db_path = '../data/'
         super(RFKAdapterTest, self).__init__(*args, **kwds)
 
-    def _set_up(self, table_name='ULIZ.DBF', mode='r', mock=False): 
-        self._adapter = RFKAdapter(self._db_path, table_name, mode, mock=mock)
+    def _set_up(self, table_name='ULIZ.DBF', mode='r'): 
+        self._adapter = RFKAdapter(self._db_path, table_name, mode)
 
     def test_101_read_constructor(self):
         """test opening the table for reading"""
-        self._adapter = RFKAdapter(self._db_path, 'ULIZ.DBF', mock=True)
+        self._adapter = RFKAdapter(self._db_path, 'ULIZ.DBF')
         self.assertEqual(self._adapter._table.status, dbf.READ_ONLY)
 
     def test_102_write_constructor(self):
         """test opening the table for reading"""
-        self._adapter = RFKAdapter(self._db_path, 'ULIZ.DBF', 'W', mock=True)
+        self._adapter = RFKAdapter(self._db_path, 'ULIZ.DBF', 'W')
         self.assertEqual(self._adapter._table.status, dbf.READ_WRITE)
 
     def test_prepare_read_value(self):
@@ -386,7 +376,7 @@ class RFKAdapterTest(TestCase):
 
     def test_single_filtered_internal_read(self):
         """test internal _reading a record filtered by a single condition"""
-        self._set_up(mock=True)
+        self._set_up()
         result = self._adapter._read([('OTP_ULI', lambda x: x == '880')])
         self.assertNotEqual(result, [])
         self.assertEqual(result[0]['OTP_ULI'], '880')
@@ -412,7 +402,7 @@ class RFKAdapterTest(TestCase):
 
     def test_single_filtered_internal_raw_read(self):
         """test _reading a single raw record filtered by a single condition"""
-        self._set_up(mock=True)
+        self._set_up()
         result = self._adapter._read([('OTP_ULI', lambda x: x == '880')], raw_result=True)
         self.assertNotEqual(result, [])
         self.assertEqual(result[0]['OTP_ULI'], '880                 ')
@@ -423,7 +413,7 @@ class RFKAdapterTest(TestCase):
 
     def test_multi_filtered_read(self):
         """test reading multiple record filtered by multiple conditions"""
-        self._set_up(mock=True)
+        self._set_up()
         result = self._adapter._read([
             ('OBJ_ULI', lambda x: x == '010'),
             ('DOK_ULI', lambda x: x == '20'),
@@ -435,7 +425,7 @@ class RFKAdapterTest(TestCase):
 
     def test_nonexistent_filter_key(self):
         """test raising a FieldError on nonexistent field filter key"""
-        self._set_up(mock=True)
+        self._set_up()
         try:
             self.assertRaises(FieldError, self._adapter._read, [('SOK_ULI', lambda x: True)])
         except:
@@ -443,12 +433,12 @@ class RFKAdapterTest(TestCase):
 
     def test_return_all(self):
         """return all the records with empty filter list"""
-        self._set_up(mock=True)
+        self._set_up()
         self.assertGreater(len(self._adapter._read()), 0)
 
     def test_record_append(self):
         """test appending a single record to the table"""
-        self._set_up('ULIZ.DBF', 'W', mock=True)
+        self._set_up('ULIZ.DBF', 'W')
         sample_record = {'OBJ_ULI': '010', 'DOK_ULI': '20', 'SIF_ULI': '00000', 'GOT_ULI': None, 'NAL_ULI': 'ADM', 'DAT_ULI': dbf.DateTime(2021, 6, 14), 'OTP_ULI': '225883', 'NAO_ULI': None, 'DAI_ULI': dbf.DateTime(2021, 6, 14), 'MIS_ULI': None, 'VAL_ULI': dbf.DateTime(2021, 6, 14), 'DAN_ULI': 0, 'RBR_ULI': 2, 'KUF_ULI': '1234', 'ZAD_ULI': '001', 'PAR_ULI': '0196552', 'PRO_ULI': None, 'TRG_ULI': None, 'KAS_ULI': 0, 'PUT_ULI': '001', 'NAP_ULI': '', 'LIK_ULI': None, 'FIN_ULI': None, 'L0_ULI': False, 'L1_ULI': False, 'L2_ULI': False, 'L3_ULI': False, 'L4_ULI': False, 'L5_ULI': False, 'L6_ULI': False, 'L7_ULI': False, 'L8_ULI': False, 'L9_ULI': False, 'L1A_ULI': None, 'L2A_ULI': None, 'L3A_ULI': None, 'L4A_ULI': None, 'L5A_ULI': None, 'N1_ULI': 0, 'N2_ULI': 0, 'FIS_ULI': None, 'REK_ULI': None, 'STO_ULI': None, 'FRA_ULI': None, 'FRR_ULI': None, 'MJE_ULI': None, 'PAS_ULI': None, 'DAS_ULI': None, 'MTR_ULI': None}
         result = self._adapter._read([
             ('OBJ_ULI', lambda x: x == '010'),
@@ -460,8 +450,15 @@ class RFKAdapterTest(TestCase):
         result = self._adapter._read([
             ('OBJ_ULI', lambda x: x == '010'),
             ('DOK_ULI', lambda x: x == '20'),
-            ])
+            ], raw_result=True)
         self.assertEqual(result[-1]['SIF_ULI'], fresh_row_id)
+        for k, v in sample_record.items():
+            field = self._adapter.header_fields[k]
+            if field.ftype == Type.CHAR:
+                if v:
+                    self.assertEqual(v, result[-1][k])
+                else:
+                    self.assertEqual(bool(v), bool(result[-1][k].strip()))
 
     def test_determine_char_field_is_int(self):
         """tests determining if the char field is an integer value"""
@@ -486,7 +483,7 @@ class RFKAdapterTest(TestCase):
 
     def test_field_string_rep(self):
         """test whether field object gets represented correctly"""
-        self._set_up(mock=True)
+        self._set_up()
         outcome = Field('OBJ_ULI', *self._adapter._table.field_info('OBJ_ULI')[:3])
         self.assertEqual(str(outcome), '<OBJ_ULI, C, 3, 0, None, None, ?>')
         outcome.is_padded, outcome.pad = self._adapter._is_char_column_padded_int(outcome)
@@ -502,7 +499,7 @@ class RFKAdapterTest(TestCase):
 
     def test_is_field_type(self):
         """tests if field type is determined correctly"""
-        self._set_up(mock=True)
+        self._set_up()
         char_field = Field('SIF_ULI', *self._adapter._table.field_info('SIF_ULI')[:3])
         date_field = Field('DAT_ULI', *self._adapter._table.field_info('DAT_ULI')[:3])
         self.assertEqual(date_field.is_type(Type.CHAR), False)
@@ -512,7 +509,7 @@ class RFKAdapterTest(TestCase):
 
     def test_determine_char_column_is_int(self):
         """tests determining if the char column is an integer value"""
-        self._set_up(mock=True)
+        self._set_up()
         mock_field = Field('SIF_ULI', *self._adapter._table.field_info('SIF_ULI')[:3])
         outcome = self._adapter._is_char_column_int(mock_field)
         self.assertEqual(outcome, True)
@@ -546,7 +543,7 @@ class RFKAdapterTest(TestCase):
 
     def test_determine_char_column_is_padded(self):
         """tests determining if an integer char column is padded"""
-        self._set_up(mock=True)
+        self._set_up()
         mock_field = Field('OBJ_ULI', *self._adapter._table.field_info('OBJ_ULI')[:3])
         outcome = self._adapter._is_char_column_padded_int(mock_field)
         self.assertEqual(outcome[0], True)
@@ -588,7 +585,7 @@ class RFKAdapterTest(TestCase):
         self.assertEqual(outcome[0], False)
         self.assertEqual(outcome[1], None)
 
-    def test_000_appending_mixed_types_record(self):
+    def test_appending_mixed_types_record(self):
         """test appending a mismatched types record to the table"""
         self._set_up('ULIZ.DBF', 'W')
         sample_record = {'OBJ_ULI': 10, 'DOK_ULI': 20, 'SIF_ULI': 0, 'GOT_ULI': None, 'NAL_ULI': 'ADM', 'DAT_ULI': '2021-07-07', 'OTP_ULI': '225883', 'NAO_ULI': None, 'DAI_ULI': '2021-06-14', 'MIS_ULI': None, 'VAL_ULI': dbf.DateTime(2021, 6, 14), 'DAN_ULI': 0, 'RBR_ULI': 2, 'KUF_ULI': '1234', 'ZAD_ULI': '001', 'PAR_ULI': '0196552', 'PRO_ULI': None, 'TRG_ULI': None, 'KAS_ULI': 0, 'PUT_ULI': '001', 'NAP_ULI': '', 'LIK_ULI': None, 'FIN_ULI': None, 'L0_ULI': False, 'L1_ULI': False, 'L2_ULI': False, 'L3_ULI': False, 'L4_ULI': False, 'L5_ULI': False, 'L6_ULI': False, 'L7_ULI': False, 'L8_ULI': False, 'L9_ULI': False, 'L1A_ULI': None, 'L2A_ULI': None, 'L3A_ULI': None, 'L4A_ULI': None, 'L5A_ULI': None, 'N1_ULI': 0, 'N2_ULI': 0, 'FIS_ULI': None, 'REK_ULI': None, 'STO_ULI': None, 'FRA_ULI': None, 'FRR_ULI': None, 'MJE_ULI': None, 'PAS_ULI': None, 'DAS_ULI': None, 'MTR_ULI': None}
@@ -612,17 +609,17 @@ class RFKAdapterTest(TestCase):
                 else:
                     self.assertEqual(bool(v), bool(result[-1][k].strip()))
 
-    # def test_updating_single_record(self):
-    #     """tests updating a single existing record"""
-    #     self.assertEqual(False, True)
+    def test_updating_single_record(self):
+        """tests updating a single existing record"""
+        self.assertEqual(False, True)
 
-    # def test_updating_multiple_records(self):
-    #     """tests updating multiple records by a certain criteria"""
-    #     self.assertEqual(False, True)
+    def test_updating_multiple_records(self):
+        """tests updating multiple records by a certain criteria"""
+        self.assertEqual(False, True)
 
     def test_is_char_column_string(self):
         """tests determining whether a char column is a string column"""
-        self._set_up(mock=True)
+        self._set_up()
         mock_field = Field('OTP_ULI', *self._adapter._table.field_info('OTP_ULI')[:3])
         outcome = self._adapter._is_char_column_string(mock_field)
         self.assertEqual(outcome, True)
@@ -638,7 +635,7 @@ class RFKAdapterTest(TestCase):
 
     def test_is_char_column_padded_string(self):
         """tests determining whether char string column is padded and how"""
-        self._set_up(mock=True)
+        self._set_up()
         result = self._adapter._read([('SIF_ULI', lambda x: x == '00911')], raw_result=True)
         self.assertNotEqual(result, [])
         self.assertEqual(result[0]['SIF_ULI'], '00911')
@@ -646,18 +643,18 @@ class RFKAdapterTest(TestCase):
     def test_read_all(self):
         """tests if all the values get read"""
         # @TODO-27: improve test
-        self._set_up(mock=True)
+        self._set_up()
         self.assertGreater(len(self._adapter.read_all()), 0)
 
     def test_filter(self):
         """tests filtering the read values"""
         # @TODO-28: improve test
-        self._set_up(mock=True)
+        self._set_up()
         self.assertGreater(len(self._adapter.filter([])), 0)
 
     def test_field_to_column_type_conversion(self):
         """tests if ftype values get converted to ctype correctly"""
-        self._set_up(mock=True)
+        self._set_up()
         mock_field = Field('MIS_ULI', *self._adapter._table.field_info('MIS_ULI')[:3], None, None, Type.UNDEFINED)
         try:
             self.assertRaises(ValueError, mock_field.ftoc('asdf'))
@@ -695,14 +692,14 @@ class RFKAdapterTest(TestCase):
     def test_is_char_column_padded_string(self):
         """tests whether the whole column is padded char strings"""
         # @TODO-30: write more tests
-        self._set_up(mock=True)
+        self._set_up()
         mock_field = Field('OTP_ULI', *self._adapter._table.field_info('OTP_ULI')[:3])
         self.assertEqual(self._adapter._is_char_column_padded_string(mock_field), (True, 'R'))
         mock_field = Field('KUF_ULI', *self._adapter._table.field_info('KUF_ULI')[:3])
         self.assertEqual(self._adapter._is_char_column_padded_string(mock_field), (True, 'L'))
 
     def test_padding(self):
-        self._set_up(mock=True)
+        self._set_up()
         self.assertEqual(self._adapter._pad('256', 8), '     256')
         self.assertEqual(self._adapter._pad(' 256 ', 8), '    256 ')
         self.assertEqual(self._adapter._pad('256', 8, ' ', 'L'), '     256')
