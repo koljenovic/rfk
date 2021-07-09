@@ -684,15 +684,22 @@ class RFKAdapterTest(TestCase):
 
     def test_read_all(self):
         """tests if all the values get read"""
-        # @TODO-27: improve test
         self._set_up()
-        self.assertGreater(len(self._adapter.read_all()), 0)
+        self.assertGreater(len(self._adapter.read_all()), 500)
 
     def test_filter(self):
         """tests filtering the read values"""
-        # @TODO-28: improve test
         self._set_up()
-        self.assertGreater(len(self._adapter.filter([])), 0)
+        outcome = self._adapter.filter([])
+        self.assertGreater(len(outcome), 0)
+        outcome = self._adapter.filter(
+            [('OBJ_ULI', lambda x: x == 10),
+            ('DOK_ULI', lambda x: x == 20),
+            ('SIF_ULI', lambda x: x == 915)])
+        self.assertEqual(len(outcome), 1)
+        self.assertEqual(outcome[0]['OBJ_ULI'], 10)
+        self.assertEqual(outcome[0]['DOK_ULI'], 20)
+        self.assertEqual(outcome[0]['SIF_ULI'], 915)
 
     def test_field_to_column_type_conversion(self):
         """tests if ftype values get converted to ctype correctly"""
@@ -733,12 +740,15 @@ class RFKAdapterTest(TestCase):
 
     def test_is_char_column_padded_string(self):
         """tests whether the whole column is padded char strings"""
-        # @TODO-30: write more tests
         self._set_up()
         mock_field = Field('OTP_ULI', *self._adapter._table.field_info('OTP_ULI')[:3])
         self.assertEqual(self._adapter._is_char_column_padded_string(mock_field), (True, 'R'))
         mock_field = Field('KUF_ULI', *self._adapter._table.field_info('KUF_ULI')[:3])
         self.assertEqual(self._adapter._is_char_column_padded_string(mock_field), (True, 'L'))
+        mock_field = self._adapter.header_fields['NAO_ULI']
+        self.assertEqual(self._adapter._is_char_column_padded_string(mock_field), (None, None))
+        mock_field = self._adapter.header_fields['NAL_ULI']
+        self.assertEqual(self._adapter._is_char_column_padded_string(mock_field), (False, None))
 
     def test_padding(self):
         mock_field = Field('MOCK_ULI', Type.CHAR, 10, 0, 'L', ' ', Type.CHAR)
@@ -754,8 +764,23 @@ class RFKAdapterTest(TestCase):
     def test_column_to_field_type_conversion(self):
         """tests if ctype values get converted to native padded ftype correctly"""
         self._set_up()
-        self.assertEqual(False, True)
-        # @TODO-31: write tests, mirror ftoc test case with adjustments
+        mock_field = Field('MIS_ULI', *self._adapter._table.field_info('MIS_ULI')[:3], None, None, Type.UNDEFINED)
+        try:
+            self.assertRaises(ValueError, mock_field.ftoc('asdf'))
+        except:
+            pass
+        mock_field = self._adapter.header_fields['SIF_ULI']
+        outcome = mock_field.ctof(123)
+        self.assertEqual(outcome, '00123')
+        mock_field = self._adapter.header_fields['DAT_ULI']
+        outcome = mock_field.ctof('2021-07-09')
+        self.assertEqual(outcome, datetime.date.fromisoformat('2021-07-09'))
+        mock_field = self._adapter.header_fields['MIS_ULI']
+        outcome = mock_field.ctof(None)
+        self.assertEqual(outcome, None)
+        mock_field = self._adapter.header_fields['KUF_ULI']
+        outcome = mock_field.ctof('1234')
+        self.assertEqual(outcome, '      1234')
 
 class RFKAdapterSlowTest(RFKAdapterTest):
     def __init__(self, *args, **kwds):
@@ -776,4 +801,4 @@ class RFKAdapterSlowTest(RFKAdapterTest):
                 self.assertEqual(str(Field(**field_value)), str(self._adapter.header_fields[field_name]))
 
 if __name__ == '__main__':
-    unittest.main(failfast=False)
+    unittest.main(failfast=True)
