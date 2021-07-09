@@ -331,7 +331,7 @@ class RFKAdapter:
         self._table.append(data)
 
     def update(self, what, where):
-        """Updates existing records"""
+        """Updates existing records, returns True on success"""
         fields = self._table._meta.fields
         for field_name, constr in where:
             if field_name not in fields:
@@ -385,7 +385,7 @@ class RFKAdapterTest(TestCase):
         self.assertEqual(self._adapter._table.status, dbf.READ_ONLY)
 
     def test_102_write_constructor(self):
-        """test opening the table for reading"""
+        """test opening the table for writing"""
         self._adapter = RFKAdapter(self._db_path, 'ULIZ.DBF', 'W')
         self.assertEqual(self._adapter._table.status, dbf.READ_WRITE)
 
@@ -764,11 +764,6 @@ class RFKAdapterTest(TestCase):
     def test_column_to_field_type_conversion(self):
         """tests if ctype values get converted to native padded ftype correctly"""
         self._set_up()
-        mock_field = Field('MIS_ULI', *self._adapter._table.field_info('MIS_ULI')[:3], None, None, Type.UNDEFINED)
-        try:
-            self.assertRaises(ValueError, mock_field.ftoc('asdf'))
-        except:
-            pass
         mock_field = self._adapter.header_fields['SIF_ULI']
         outcome = mock_field.ctof(123)
         self.assertEqual(outcome, '00123')
@@ -801,4 +796,4 @@ class RFKAdapterSlowTest(RFKAdapterTest):
                 self.assertEqual(str(Field(**field_value)), str(self._adapter.header_fields[field_name]))
 
 if __name__ == '__main__':
-    unittest.main(failfast=True)
+    unittest.main(failfast=False)
