@@ -632,9 +632,8 @@ class RFKAdapterTest(TestCase):
                 else:
                     self.assertEqual(bool(v), bool(result[-1][k].strip()))
 
-    def test_001_updating_single_record(self):
+    def test_updating_single_record(self):
         """tests updating a single existing record"""
-        # @HERE@TODO-012
         self._set_up('ULIZ.DBF', 'W')
         today = datetime.date.today().isoformat()
         randval = str(secrets.randbelow(10**6))
@@ -654,10 +653,25 @@ class RFKAdapterTest(TestCase):
         self.assertEqual(outcome[-1]['DAT_ULI'], today)
         self.assertEqual(outcome[-1]['KUF_ULI'], randval)
 
-    def test_002_updating_multiple_records(self):
+    def test_updating_multiple_records(self):
         """tests updating multiple records by a certain criteria"""
-        # @TODO-32: write test case
-        self.assertEqual(False, True)
+        self._set_up('ULIZ.DBF', 'W')
+        randval = str(secrets.randbelow(10**6))
+        success = self._adapter.update(
+            { 'KUF_ULI': randval},
+            [('OBJ_ULI', lambda x: x == 10),
+            ('DOK_ULI', lambda x: x == 20),
+            ('SIF_ULI', lambda x: x >= 800 and x < 810),
+            ])
+        self.assertEqual(success, True)
+        outcome = self._adapter.filter([
+            ('OBJ_ULI', lambda x: x == 10),
+            ('DOK_ULI', lambda x: x == 20),
+            ('SIF_ULI', lambda x: x >= 800 and x < 810),
+            ])
+        self.assertNotEqual(outcome, [])
+        for record in outcome:
+            self.assertEqual(record['KUF_ULI'], randval)
 
     def test_is_char_column_string(self):
         """tests determining whether a char column is a string column"""
