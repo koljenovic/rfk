@@ -1,0 +1,52 @@
+openapi: "3.0.3"
+info:
+  description: "RFK RESTful API"
+  version: "1.0.0"
+  title: "RFK API"
+  termsOfService: ""
+  contact:
+    email: "malik@mekom.ba"
+  license:
+    name: "MIT"
+    url: "https://opensource.org/licenses/MIT"
+servers:
+  - url: /v1
+    description: AVI v1 URL
+paths:
+  /:
+    get:
+      description: List all the database tables
+      responses:
+        200:
+          description: a list of all the database tables
+  /{table}:
+    get:
+      description: Filter results on the supplied arguments, meant to emulate SQL SELECT with WHERE clause. Returns metadata on all requests.
+      responses:
+        201:
+          description: a list of results matching the supplied filters, full table dump on empty filters
+        204:
+          description: there is no content matching the supplied filters
+    post:
+      description: Append a new record to the table, meant to emulate SQL INSERT.
+      responses:
+        200:
+          description: confirmation of successful append operation
+        400:
+          description: bad request sent, record not appended
+    patch:
+      description: Update one or many record fields based on a supplied filter, meant to emulate SQL UPDATE.
+      responses:
+        200:
+          description: confirmation of successful update operation
+        204:
+          description: there is no content matching the supplied filters, no records updated
+        400:
+          description: bad request sent, no records updated
+    parameters:
+    - name: table
+      in: path
+      description: database name
+      required: true
+      schema:
+        type: 'string'
