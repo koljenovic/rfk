@@ -1,8 +1,8 @@
 openapi: "3.0.3"
 info:
-  description: "RFK RESTful API"
   version: "1.0.0"
-  title: "RFK API"
+  title: "RFK REST API Dokumentacija"
+  description: "**RFK RESTful API** omogućava jednostavan HTTP REST pristup lokalnim legacy DBF \"*bazama podataka*\", originalno korištenim u programskim jezicima Clipper i Visual FoxPro. API podržava čitanje i izmjenu postojećih kao i dodavanje novih zapisa kroz emulaciju `SELECT`, `UPDATE` i `INSERT` SQL DML iskaze nad .DBF *tabelama* (datotekama) unutar `/data` direktorija, brisanje zapisa nije podržano. API je namjenski pisan za RFK računovodstvenu aplikaciju izrađenu u Clipperu, te je na njoj i testiran, no trebao bi bez većih izmjena podržavati bilo koju vrstu Clipper ili VFP .DBF podatkovne datoteke. Kako se radi o vrlo starom legacy formatu, ne preporučuje se korištenje .DBF datoteka za trajno spremanje podataka u savremenim programskim rješenjima, ovaj API stoga prvenstveno služi za čitanje podataka zarobljenih u .DBF formatu, migraciju i privremena integracijska rješenja, ukoliko trebate savremeno, pouzdano i jednostavno rješenje za lokalno spremanje i pristup podacima razmotrite korišenje SQLite datotečne baze podataka sa punom SQL podrškom."
   termsOfService: ""
   contact:
     email: "malik@mekom.ba"
@@ -11,38 +11,38 @@ info:
     url: "https://opensource.org/licenses/MIT"
 servers:
   - url: /v1
-    description: AVI v1 URL
+    description: API v1 URL
 paths:
   /:
     get:
-      description: List all the database tables
+      description: Izlistava sve dostupne `*.DBF` *tabele* u `/data` direktoriju (*bazi podataka*)
       responses:
         200:
-          description: a list of all the database tables
+          description: lista svih tabela u bazi
   /{table}:
     get:
-      description: Filter results on the supplied arguments, meant to emulate SQL SELECT with WHERE clause. Returns metadata on all requests.
+      description: Filtrira rezultate u skladu sa datim argumentima, ima za cilj emulaciju SQL SELECT iskaza sa WHERE kauzulom. Vraća metapodatke uz svaki zahtjev.
       responses:
         201:
-          description: a list of results matching the supplied filters, full table dump on empty filters
+          description: lista rezultata koji zadovoljavaju date filtere, kompletna tabela u slučaju praznih filtera
         204:
-          description: there is no content matching the supplied filters
+          description: nema sadržaja koji odgovara datim filterima
     post:
-      description: Append a new record to the table, meant to emulate SQL INSERT.
+      description: Dodaje novi zapis u tabelu, emulira SQL INSERT.
       responses:
         200:
-          description: confirmation of successful append operation
+          description: potvrda uspješne operacije dodavanja
         400:
-          description: bad request sent, record not appended
+          description: loš zahtjev, zapis nije dodan.
     patch:
-      description: Update one or many record fields based on a supplied filter, meant to emulate SQL UPDATE.
+      description: Ažurira jedan ili više zapisa u skladu sa datim filterima, emulira SQL UPDATE.
       responses:
         200:
-          description: confirmation of successful update operation
+          description: potvrda uspješne operacije ažuriranja
         204:
-          description: there is no content matching the supplied filters, no records updated
+          description: nema sadržaja koji odgovara datim filterima, zapisi nisu ažurirani
         400:
-          description: bad request sent, no records updated
+          description: loš zahtjev, zapisi nisu ažurirani
     parameters:
     - name: table
       in: path
