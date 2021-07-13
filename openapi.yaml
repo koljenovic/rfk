@@ -1,48 +1,65 @@
 openapi: "3.0.3"
 info:
-  version: "1.0.0"
-  title: "RFK REST API Dokumentacija"
-  description: "**RFK RESTful API** omogućava jednostavan HTTP REST pristup lokalnim legacy DBF \"*bazama podataka*\", originalno korištenim u programskim jezicima Clipper i Visual FoxPro. API podržava čitanje i izmjenu postojećih kao i dodavanje novih zapisa kroz emulaciju `SELECT`, `UPDATE` i `INSERT` SQL DML iskaze nad .DBF *tabelama* (datotekama) unutar `/data` direktorija, brisanje zapisa nije podržano. API je namjenski pisan za RFK računovodstvenu aplikaciju izrađenu u Clipperu, te je na njoj i testiran, no trebao bi bez većih izmjena podržavati bilo koju vrstu Clipper ili VFP .DBF podatkovne datoteke. Kako se radi o vrlo starom legacy formatu, ne preporučuje se korištenje .DBF datoteka za trajno spremanje podataka u savremenim programskim rješenjima, ovaj API stoga prvenstveno služi za čitanje podataka zarobljenih u .DBF formatu, migraciju i privremena integracijska rješenja, ukoliko trebate savremeno, pouzdano i jednostavno rješenje za lokalno spremanje i pristup podacima razmotrite korišenje SQLite datotečne baze podataka sa punom SQL podrškom."
+  version: "0.0.2"
+  title: "RFK API Dokumentacija"
+  description: |
+    **RFK RESTful API** omogućava jednostavan HTTP REST pristup lokalnim legacy DBF \"*bazama podataka*\" originalno korištenim u programskim jezicima Clipper i Visual FoxPro. Generički API podržava čitanje i izmjenu postojećih kao i dodavanje novih zapisa kroz emulaciju `SELECT`, `UPDATE` i `INSERT` SQL DML iskaza nad .DBF *tabelama* (datotekama) unutar `data` direktorija, brisanje nije podržano.
+    
+    **Ne preporučuje se korištenje .DBF datoteka za trajno spremanje podataka u savremenim programskim rješenjima**, ovaj API prvenstveno služi za čitanje podataka zarobljenih u .DBF formatu, migraciju i privremena integracijska rješenja, ukoliko trebate savremeno, pouzdano i jednostavno rješenje za lokalnu pohranu i pristup razmotrite SQLite datotečnu bazu podataka sa punom SQL podrškom.
+    
+    *Napomena:* API je namjenski pisan za RFK računovodstvenu aplikaciju izrađenu u Clipperu, te je na njoj i testiran, no trebao bi bez većih izmjena podržavati bilo koju vrstu Clipper ili VFP .DBF podatkovne datoteke.
+    
+    Copyright 2021 MEKOM d.o.o. Visoko - MIT Licenca
+
   termsOfService: ""
   contact:
     email: "malik@mekom.ba"
   license:
     name: "MIT"
     url: "https://opensource.org/licenses/MIT"
-servers:
-  - url: /v1
-    description: API v1 URL
+security:
+  - APIKey: []
 paths:
   /:
     get:
-      description: Izlistava sve dostupne `*.DBF` *tabele* u `/data` direktoriju (*bazi podataka*)
+      summary: Listing dostupnih tabela
+      description: Izlistava sve dostupne `*.DBF` *tabele* u `data` direktoriju (*bazi podataka*)
+      tags:
+        - Meta
       responses:
         200:
           description: lista svih tabela u bazi
-  /{table}:
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+              examples:
+                ULIZ zapis:
+                  $ref: '#/components/examples/TablesSample'
+        401:
+          $ref: "#/components/responses/Unauthorized"
+  /{table}/details:
     get:
-      description: Filtrira rezultate u skladu sa datim argumentima, ima za cilj emulaciju SQL SELECT iskaza sa WHERE kauzulom. Vraća metapodatke uz svaki zahtjev.
-      responses:
-        201:
-          description: lista rezultata koji zadovoljavaju date filtere, kompletna tabela u slučaju praznih filtera
-        204:
-          description: nema sadržaja koji odgovara datim filterima
-    post:
-      description: Dodaje novi zapis u tabelu, emulira SQL INSERT.
+      summary: Izlistava metapodatke za tabelu
+      description: Izlistava nazive svih kolona za datu tabelu.
+      tags:
+        - Meta
       responses:
         200:
-          description: potvrda uspješne operacije dodavanja
-        400:
-          description: loš zahtjev, zapis nije dodan.
-    patch:
-      description: Ažurira jedan ili više zapisa u skladu sa datim filterima, emulira SQL UPDATE.
-      responses:
-        200:
-          description: potvrda uspješne operacije ažuriranja
-        204:
-          description: nema sadržaja koji odgovara datim filterima, zapisi nisu ažurirani
-        400:
-          description: loš zahtjev, zapisi nisu ažurirani
+          description: listing kolona tabele
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+              examples:
+                ULIZ detalji:
+                  $ref: '#/components/examples/ULIZDetailsSample'
+        401:
+          $ref: "#/components/responses/Unauthorized"
     parameters:
     - name: table
       in: path
@@ -50,3 +67,345 @@ paths:
       required: true
       schema:
         type: 'string'
+  /{table}/filter:
+    post:
+      summary: Filtrira rezultate u skladu sa argumentima (SELECT)
+      description: Filtrira rezultate u skladu sa datim argumentima, ima za cilj emulaciju SQL SELECT iskaza sa WHERE kauzulom. Vraća tabelarne metapodatke uz svaki zahtjev.
+      tags:
+        - Tabele
+      requestBody:
+        required: true
+        content: 
+          application/json:
+            schema:
+              type: array
+              items: 
+                $ref: '#/components/schemas/WhereType'
+            examples:
+              ULIZ filter:
+                $ref: '#/components/examples/ULIZFilter00'
+      responses:
+        201:
+          description: lista rezultata koji zadovoljavaju date filtere, kompletna tabela u slučaju praznih filtera
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+              examples:
+                ULIZ zapis:
+                  $ref: '#/components/examples/ULIZRecord'
+        204:
+          description: nema sadržaja koji odgovara datim filterima
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                example:
+                  []
+        400:
+          description: loš ili nepotpun zahtjev
+        401:
+          $ref: "#/components/responses/Unauthorized"
+    parameters:
+    - name: table
+      in: path
+      description: database name
+      required: true
+      schema:
+        type: 'string'
+  /{table}:
+    post:
+      summary: Dodaje novi zapis (INSERT)
+      description: Dodaje novi zapis u tabelu, emulira SQL INSERT.
+      tags:
+        - Tabele
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/DictType'
+            examples:
+              ULIZ zapis:
+                $ref: '#/components/examples/ULIZRecord'
+      responses:
+        200:
+          description: potvrda uspješne operacije dodavanja
+        400:
+          description: loš zahtjev, zapis nije dodan.
+        401:
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      summary: Ažurira zapise u skladu sa filterima (UPDATE)
+      description: Ažurira jedan ili više zapisa u skladu sa datim filterima, emulira SQL UPDATE.
+      tags:
+        - Tabele
+      requestBody:
+        required: true
+        content: 
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateType'
+            examples:
+              ULIZ izmjena:
+                $ref: '#/components/examples/ULIZUpdate915'
+      responses:
+        200:
+          description: potvrda uspješne operacije ažuriranja
+        204:
+          description: nema sadržaja koji odgovara datim filterima, zapisi nisu ažurirani
+        400:
+          description: loš zahtjev, zapisi nisu ažurirani
+        401:
+          $ref: "#/components/responses/Unauthorized"
+    parameters:
+    - name: table
+      in: path
+      description: database name
+      required: true
+      schema:
+        type: 'string'
+
+components:
+  schemas:
+    DictType:
+      type: object
+      additionalProperties:
+        oneOf:
+          - type: integer
+          - type: string
+          - type: number
+          - type: boolean
+    WhereType:
+      type: object
+      required:
+        - value
+        - comparator
+        - column_name
+      properties:
+        column_name:
+          type: string
+          description: tačan i potpun naziv kolone u tabeli
+        comparator:
+          type: string
+          description: |
+            operator za poređenje, jedna vrijednost od:
+            * < (lt), > (gt), <= (lte), >= (gte), == (eq), != (neq)
+            * si - parcijalno uparivanje stringova bez obzira na mala i velika slova
+            * s - parcijalno uparivanje stringova uz razlikovanje malih i velikih slova
+            * x - uparivanje stringova korištenjem regularnih izraza (regex)
+          enum:
+          - 'lt'
+          - 'gt'
+          - 'lte'
+          - 'gte'
+          - 'eq'
+          - 'neq'
+          - 'si'
+          - 's'
+          - 'x'
+        value:
+          type: string
+          description: vrijednost korištena za komparaciju
+    WhatType:
+      type: object
+      additionalProperties:
+        oneOf:
+          - type: integer
+          - type: string
+          - type: number
+          - type: boolean
+    UpdateType:
+      type: object
+      required:
+        - what
+        - where
+      properties:
+        what:
+          $ref: '#/components/schemas/WhatType'
+        where:
+          type: array
+          items:
+            $ref: '#/components/schemas/WhereType'
+  examples:
+    ULIZRecord:
+      value:
+        - OBJ_ULI: 10
+          DOK_ULI: 20
+          SIF_ULI: 915
+          GOT_ULI: null
+          NAL_ULI: ADM
+          DAT_ULI: '2021-07-07'
+          OTP_ULI: '225883'
+          NAO_ULI: null
+          DAI_ULI: '2021-06-14'
+          MIS_ULI: null
+          VAL_ULI: '2021-06-14'
+          DAN_ULI: 0
+          RBR_ULI: 2
+          KUF_ULI: '1234'
+          ZAD_ULI: '001'
+          PAR_ULI: 0196552
+          PRO_ULI: null
+          TRG_ULI: null
+          KAS_ULI: 0
+          PUT_ULI: '001'
+          NAP_ULI: ''
+          LIK_ULI: null
+          FIN_ULI: null
+          L0_ULI: false
+          L1_ULI: false
+          L2_ULI: false
+          L3_ULI: false
+          L4_ULI: false
+          L5_ULI: false
+          L6_ULI: false
+          L7_ULI: false
+          L8_ULI: false
+          L9_ULI: false
+          L1A_ULI: null
+          L2A_ULI: null
+          L3A_ULI: null
+          L4A_ULI: null
+          L5A_ULI: null
+          N1_ULI: 0
+          N2_ULI: 0
+          FIS_ULI: null
+          REK_ULI: null
+          STO_ULI: null
+          FRA_ULI: null
+          FRR_ULI: null
+          MJE_ULI: null
+          PAS_ULI: null
+          DAS_ULI: null
+          MTR_ULI: null
+    ULIZFilter00:
+      value:
+        - column_name: OBJ_ULI
+          comparator: eq
+          value: '010'
+        - column_name: DOK_ULI
+          comparator: eq
+          value: 20
+        - column_name: SIF_ULI
+          comparator: eq
+          value: 915
+    ULIZUpdate915:
+      value:
+        what:
+          DAT_ULI: '2021-07-13'
+        where:
+          - column_name: OBJ_ULI
+            comparator: eq
+            value: 10
+          - column_name: DOK_ULI
+            comparator: eq
+            value: 20
+          - column_name: SIF_ULI
+            comparator: eq
+            value: 915
+    TablesSample:
+      value:
+        - ADOB
+        - KUF
+        - PRRA
+        - ADRE
+        - KUPA
+        - PRXX
+        - AKUP
+        - MAJS
+        - PUTN
+        - ANFA
+        - OBJE
+        - RABA
+        - APRR
+        - OURI
+        - REGI
+        - REZE
+        - PART
+        - ROBA
+        - CSSA
+        - PASS
+        - SNUM
+        - DOBA
+        - POBA
+        - SORM
+        - DROB
+        - POPR
+        - TARI
+        - FAKT
+        - POS
+        - ULIZ
+        - GOTO
+        - POSP
+        - USLU
+        - KATE
+        - PROM
+        - ZADL
+        - KLAS
+        - PROP
+    ULIZDetailsSample:
+      value:
+        - OBJ_ULI
+        - DOK_ULI
+        - SIF_ULI
+        - GOT_ULI
+        - NAL_ULI
+        - DAT_ULI
+        - OTP_ULI
+        - NAO_ULI
+        - DAI_ULI
+        - MIS_ULI
+        - VAL_ULI
+        - DAN_ULI
+        - RBR_ULI
+        - KUF_ULI
+        - ZAD_ULI
+        - PAR_ULI
+        - PRO_ULI
+        - TRG_ULI
+        - KAS_ULI
+        - PUT_ULI
+        - NAP_ULI
+        - LIK_ULI
+        - FIN_ULI
+        - L0_ULI
+        - L1_ULI
+        - L2_ULI
+        - L3_ULI
+        - L4_ULI
+        - L5_ULI
+        - L6_ULI
+        - L7_ULI
+        - L8_ULI
+        - L9_ULI
+        - L1A_ULI
+        - L2A_ULI
+        - L3A_ULI
+        - L4A_ULI
+        - L5A_ULI
+        - N1_ULI
+        - N2_ULI
+        - FIS_ULI
+        - REK_ULI
+        - STO_ULI
+        - FRA_ULI
+        - FRR_ULI
+        - MJE_ULI
+        - PAS_ULI
+        - DAS_ULI
+        - MTR_ULI
+  securitySchemes:
+    APIKey:
+      type: apiKey
+      in: query
+      name: auth
+  responses:
+    Unauthorized:
+      description: API autorizacijski ključ nije unesen ili je pogrešan
