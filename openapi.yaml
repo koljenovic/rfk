@@ -17,8 +17,6 @@ info:
   license:
     name: "MIT"
     url: "https://opensource.org/licenses/MIT"
-security:
-  - APIKey: []
 paths:
   /:
     get:
@@ -26,6 +24,9 @@ paths:
       description: Izlistava sve dostupne `*.DBF` *tabele* u `data` direktoriju (*bazi podataka*)
       tags:
         - Meta
+      security:
+        - ReadKey: []
+        - WriteKey: []
       responses:
         200:
           description: lista svih tabela u bazi
@@ -46,6 +47,9 @@ paths:
       description: Izlistava nazive svih kolona za datu tabelu.
       tags:
         - Meta
+      security:
+        - ReadKey: []
+        - WriteKey: []
       responses:
         200:
           description: listing kolona tabele
@@ -73,6 +77,9 @@ paths:
       description: Filtrira rezultate u skladu sa datim argumentima, ima za cilj emulaciju SQL SELECT iskaza sa WHERE kauzulom. Vraća tabelarne metapodatke uz svaki zahtjev.
       tags:
         - Tabele
+      security:
+        - ReadKey: []
+        - WriteKey: []
       requestBody:
         required: true
         content: 
@@ -123,6 +130,8 @@ paths:
       description: Dodaje novi zapis u tabelu, emulira SQL INSERT.
       tags:
         - Tabele
+      security:
+        - WriteKey: []
       requestBody:
         required: true
         content:
@@ -146,6 +155,8 @@ paths:
       description: Ažurira jedan ili više zapisa u skladu sa datim filterima, emulira SQL UPDATE.
       tags:
         - Tabele
+      security:
+        - WriteKey: []
       requestBody:
         required: true
         content: 
@@ -179,7 +190,6 @@ components:
       description: generički `dict` podatkovni tip.
       additionalProperties:
         oneOf:
-          - type: integer
           - type: string
           - type: number
           - type: boolean
@@ -285,10 +295,10 @@ components:
           value: '010'
         - column_name: DOK_ULI
           comparator: eq
-          value: 20
+          value: "20"
         - column_name: SIF_ULI
           comparator: eq
-          value: 915
+          value: "915"
     ULIZUpdate915:
       value:
         what:
@@ -296,13 +306,13 @@ components:
         where:
           - column_name: OBJ_ULI
             comparator: eq
-            value: 10
+            value: "10"
           - column_name: DOK_ULI
             comparator: eq
-            value: 20
+            value: "20"
           - column_name: SIF_ULI
             comparator: eq
-            value: 915
+            value: "915"
     TablesSample:
       value:
         - ADOB
@@ -395,10 +405,16 @@ components:
         - DAS_ULI
         - MTR_ULI
   securitySchemes:
-    APIKey:
+    ReadKey:
       type: apiKey
-      in: query
-      name: auth
+      in: header
+      name: X-API-RKEY
+      x-apikeyInfoFunc: swagger_server.controllers.authorization_controller.check_rkey
+    WriteKey:
+      type: apiKey
+      in: header
+      name: X-API-WKEY
+      x-apikeyInfoFunc: swagger_server.controllers.authorization_controller.check_wkey
   responses:
     Unauthorized:
       description: API autorizacijski ključ nije unesen ili je pogrešan
