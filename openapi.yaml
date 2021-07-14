@@ -176,6 +176,7 @@ components:
   schemas:
     DictType:
       type: object
+      description: generički `dict` podatkovni tip.
       additionalProperties:
         oneOf:
           - type: integer
@@ -213,14 +214,6 @@ components:
         value:
           type: string
           description: vrijednost korištena za komparaciju
-    WhatType:
-      type: object
-      additionalProperties:
-        oneOf:
-          - type: integer
-          - type: string
-          - type: number
-          - type: boolean
     UpdateType:
       type: object
       required:
@@ -228,7 +221,7 @@ components:
         - where
       properties:
         what:
-          $ref: '#/components/schemas/WhatType'
+          $ref: '#/components/schemas/DictType'
         where:
           type: array
           items:
