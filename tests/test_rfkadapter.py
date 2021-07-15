@@ -12,10 +12,10 @@ Copyright
 
 """
 
+import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)) + "/../src")
 
-import os
 import rfkadapter
 import mdbf as dbf
 import json
