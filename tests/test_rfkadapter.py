@@ -14,7 +14,7 @@ Copyright
 
 import os
 import sys
-sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)) + "/../src")
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)) + '/../src')
 
 import rfkadapter
 import mdbf as dbf
@@ -29,7 +29,7 @@ RUN_SLOW = True
 
 class RFKAdapterTest(TestCase):
     def __init__(self, *args, **kwds):
-        self._db_path = './data/'
+        self._db_path = os.path.dirname(os.path.realpath(__file__)) + '/data/'
         super(RFKAdapterTest, self).__init__(*args, **kwds)
 
     def _set_up(self, table_name='ULIZ.DBF', mode='r'): 
