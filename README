@@ -1,2 +1,3 @@
 # RFK RESTful API
-RESTful ReFKo JSON API
+
+RFKAdapter omogućava jednostavan pristup lokalnim legacy DBF "bazama podataka" originalno korištenim u programskim jezicima Clipper i Visual FoxPro putem. Namjenski je pisan za RFK računovodstvenu aplikaciju, uključuje pip dbf paket.
