@@ -36,7 +36,6 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import json
 import mdbf as dbf
 import os
-from six import string_types
 from collections import defaultdict
 from datetime import date
 
@@ -115,10 +114,10 @@ class Field:
                     else:
                         return str(value)
             elif self.ctype == Type.CHAR:
-                if self.is_padded and isinstance(value, string_types):
+                if self.is_padded and isinstance(value, str):
                     return self._pad(value)
         if self.ftype == Type.DATE:
-            if isinstance(value, string_types):
+            if isinstance(value, str):
                 return date.fromisoformat(value)
         return value
 
@@ -139,7 +138,7 @@ class RFKAdapter:
     def _prepare_value(value):
         """Converts encoding and strips whitespace"""
         e = value.decode('cp852') if isinstance(value, bytes) else value
-        return e.strip() if isinstance(e, string_types) else e
+        return e.strip() if isinstance(e, str) else e
 
     @staticmethod
     def _char_to_int(value):
@@ -152,7 +151,7 @@ class RFKAdapter:
     @staticmethod
     def _is_char_padded_string(value, length, pad=' '):
         """determines if and how the value is padded if it can be determined"""
-        if not isinstance(value, string_types):
+        if not isinstance(value, str):
             raise ValueError('%s is not CHAR type', value)
         if not value.strip():
             return None, None

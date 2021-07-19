@@ -4,10 +4,9 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-six = "*"
-dbf = "*"
 
 [dev-packages]
+tox = "*"
 
 [requires]
 python_version = "3.9"
