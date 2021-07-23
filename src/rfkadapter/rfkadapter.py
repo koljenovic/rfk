@@ -36,6 +36,8 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import json
 import mdbf as dbf
 import os
+import re
+
 from collections import defaultdict
 from datetime import date
 
@@ -87,6 +89,16 @@ class Field:
         elif side == 'R':
             return value + pad * (length - len(value))
         raise Exception('Undefined padding side %s.', side)
+
+    def strtoc(self, value):
+        """best effort converts str values into ctype"""
+        if self.ctype == Type.INTEGER:
+            return int(value) if value else None
+        if self.ctype in [Type.FLOAT, Type.CURRENCY, Type.DOUBLE, Type.NUMERIC]:
+            return float(value) if value else None
+        if self.ftype == Type.DATE:
+            return date.fromisoformat(value) if value else None
+        return value if value else None
 
     def ftoc(self, value):
         """converts ftype values into ctype if possible"""
@@ -316,6 +328,43 @@ class RFKAdapter:
         where e.g. [('OBJ_ULI', lambda x: x == '010')]
         """
         return self._read(where, infer_type=True)
+
+    def _convert_condition(self, column, comparator, constraint):
+        """Converts between convenience and filter condition styles
+
+        < (lt), > (gt), <= (lte), >= (gte), == (eq), != (neq)
+        si - parcijalno uparivanje stringova bez obzira na mala i velika slova
+        s - parcijalno uparivanje stringova uz razlikovanje malih i velikih slova
+        x - uparivanje stringova korištenjem regularnih izraza (regex)
+        """
+        _map = {
+            'lt': lambda x: x < self.header_fields[column].strtoc(constraint),
+            'gt': lambda x: x > self.header_fields[column].strtoc(constraint),
+            'lte': lambda x: x <= self.header_fields[column].strtoc(constraint),
+            'gte': lambda x: x >= self.header_fields[column].strtoc(constraint),
+            'eq': lambda x: x == self.header_fields[column].strtoc(constraint),
+            'neq': lambda x: x != self.header_fields[column].strtoc(constraint),
+            'si': lambda x: x.lower().find(constraint.lower()) >= 0,
+            's': lambda x: x.find(constraint) >= 0,
+            'x': lambda x: re.search(constraint, x) != None,
+        }
+        if comparator in ['si', 's', 'x'] and self.header_fields[column].ctype != Type.CHAR:
+            raise ValueError('invalid compararator for non string column type')
+        if comparator in _map:
+            return (column, _map[comparator])
+        else:
+            raise ValueError('invalid comparator %s', comparator)
+
+    def where(self, conditions=[]):
+        """Convenience filter method
+
+        Written in order to facilitate external calls with conditions
+        styled like: [('COL', 'gt', 'VALUE'), ('COL', 'lt', 'VALUE')]
+        conditions get type inferred and operators bacome lambdas
+        """
+        # conditions = self._convert_condition
+        # @TODO:HERE: write tests, impl
+        pass
 
     def write(self, data):
         """Appends a new record to the table"""

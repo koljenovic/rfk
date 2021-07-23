@@ -447,6 +447,79 @@ class RFKAdapterTest(TestCase):
         outcome = mock_field.ctof('1234')
         self.assertEqual(outcome, '      1234')
 
+    def test_convert_condition(self):
+        self._set_up()
+        outcome = self._adapter._convert_condition('SIF_ULI', 'eq', '123')
+        self.assertEqual(outcome[0], 'SIF_ULI')
+        self.assertEqual(outcome[1](123), True)
+        try:
+            self.assertRaises(ValueError, self._adapter._convert_condition('SIF_ULI', 'x', '123'))
+            self.assertRaises(ValueError, self._adapter._convert_condition('SIF_ULI', 'si', '123'))
+            self.assertRaises(ValueError, self._adapter._convert_condition('SIF_ULI', 's', '123'))
+            self.assertRaises(ValueError, self._adapter._convert_condition('SIF_ULI', 're', '123'))
+        except:
+            pass
+        outcome = self._adapter._convert_condition('DAT_ULI', 'eq', '2021-07-09')
+        self.assertEqual(outcome[0], 'DAT_ULI')
+        self.assertEqual(outcome[1](datetime.date.fromisoformat('2021-07-09')), True)
+        outcome = self._adapter._convert_condition('DAT_ULI', 'neq', '2021-07-09')
+        self.assertEqual(outcome[1](datetime.date.fromisoformat('2021-07-10')), True)
+        self.assertEqual(outcome[1](datetime.date.fromisoformat('2021-07-09')), False)
+        outcome = self._adapter._convert_condition('DAT_ULI', 'lt', '2021-07-09')
+        self.assertEqual(outcome[1](datetime.date.fromisoformat('2021-07-08')), True)
+        self.assertEqual(outcome[1](datetime.date.fromisoformat('2021-07-09')), False)
+        self.assertEqual(outcome[1](datetime.date.fromisoformat('2021-07-10')), False)
+        outcome = self._adapter._convert_condition('DAT_ULI', 'gt', '2021-07-09')
+        self.assertEqual(outcome[1](datetime.date.fromisoformat('2021-07-08')), False)
+        self.assertEqual(outcome[1](datetime.date.fromisoformat('2021-07-09')), False)
+        self.assertEqual(outcome[1](datetime.date.fromisoformat('2021-07-10')), True)
+        outcome = self._adapter._convert_condition('DAT_ULI', 'lte', '2021-07-09')
+        self.assertEqual(outcome[1](datetime.date.fromisoformat('2021-07-08')), True)
+        self.assertEqual(outcome[1](datetime.date.fromisoformat('2021-07-09')), True)
+        self.assertEqual(outcome[1](datetime.date.fromisoformat('2021-07-10')), False)
+        outcome = self._adapter._convert_condition('DAT_ULI', 'gte', '2021-07-09')
+        self.assertEqual(outcome[1](datetime.date.fromisoformat('2021-07-08')), False)
+        self.assertEqual(outcome[1](datetime.date.fromisoformat('2021-07-09')), True)
+        self.assertEqual(outcome[1](datetime.date.fromisoformat('2021-07-10')), True)
+        outcome = self._adapter._convert_condition('MIS_ULI', 'eq', '')
+        self.assertEqual(outcome[0], 'MIS_ULI')
+        self.assertEqual(outcome[1](None), True)
+        # mock_field = self._adapter.header_fields['KUF_ULI']
+        # outcome = mock_field.ctof('1234')
+        # self.assertEqual(outcome, '      1234')
+        outcome = self._adapter._convert_condition('KUF_ULI', 'eq', '123')
+        self.assertEqual(outcome[0], 'KUF_ULI')
+        self.assertEqual(outcome[1]('123'), True)
+        self.assertEqual(outcome[1](123), False)
+        outcome = self._adapter._convert_condition('KUF_ULI', 'si', 'skaf')
+        self.assertEqual(outcome[1]('SkAfIsKaFnJaK'), True)
+        self.assertEqual(outcome[1]('1234'), False)
+        outcome = self._adapter._convert_condition('KUF_ULI', 's', 'skaf')
+        self.assertEqual(outcome[1]('SkAfIsKaFnJaK'), False)
+        self.assertEqual(outcome[1]('skafiskafnjak'), True)
+        outcome = self._adapter._convert_condition('KUF_ULI', 'x', '^SkAf.*')
+        self.assertEqual(outcome[1]('SkAfIsKaFnJaK'), True)
+        self.assertEqual(outcome[1]('IsKaFnJaKSkAf'), False)
+        self.assertEqual(outcome[1]('skafiskafnjak'), False)
+
+    def test_field_strtoc(self):
+        self._set_up()
+        mock_field = self._adapter.header_fields['SIF_ULI']
+        outcome = mock_field.strtoc('123')
+        self.assertEqual(outcome, 123)
+        mock_field = self._adapter.header_fields['DAT_ULI']
+        outcome = mock_field.strtoc('2021-07-09')
+        self.assertEqual(outcome, datetime.date.fromisoformat('2021-07-09'))
+        mock_field = self._adapter.header_fields['MIS_ULI']
+        outcome = mock_field.strtoc(None)
+        self.assertEqual(outcome, None)
+        mock_field = self._adapter.header_fields['MIS_ULI']
+        outcome = mock_field.strtoc('')
+        self.assertEqual(outcome, None)
+        mock_field = self._adapter.header_fields['KUF_ULI']
+        outcome = mock_field.strtoc('1234')
+        self.assertEqual(outcome, '1234')
+
 class RFKAdapterSlowTest(RFKAdapterTest):
     def __init__(self, *args, **kwds):
         super(RFKAdapterSlowTest, self).__init__(*args, **kwds)
@@ -466,4 +539,4 @@ class RFKAdapterSlowTest(RFKAdapterTest):
                 self.assertEqual(str(Field(**field_value)), str(self._adapter.header_fields[field_name]))
 
 if __name__ == '__main__':
-    unittest.main(failfast=False)
+    unittest.main(failfast=True)
