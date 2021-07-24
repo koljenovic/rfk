@@ -522,8 +522,8 @@ class RFKAdapterTest(TestCase):
         outcome = mock_field.strtoc('2.2')
         self.assertEqual(outcome, 2.2)
 
-    def test_000_where(self):
-        """test _reading a single raw record filtered by a single condition"""
+    def test_where(self):
+        """test where convenience method"""
         self._set_up()
         outcome = self._adapter.where([('OTP_ULI', 'eq', '880')])
         self.assertNotEqual(outcome, [])
