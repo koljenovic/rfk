@@ -448,6 +448,7 @@ class RFKAdapterTest(TestCase):
         self.assertEqual(outcome, '      1234')
 
     def test_convert_condition(self):
+        """tests if convenience style where conditions get translated correctly"""
         self._set_up()
         outcome = self._adapter._convert_condition('SIF_ULI', 'eq', '123')
         self.assertEqual(outcome[0], 'SIF_ULI')
@@ -484,9 +485,6 @@ class RFKAdapterTest(TestCase):
         outcome = self._adapter._convert_condition('MIS_ULI', 'eq', '')
         self.assertEqual(outcome[0], 'MIS_ULI')
         self.assertEqual(outcome[1](None), True)
-        # mock_field = self._adapter.header_fields['KUF_ULI']
-        # outcome = mock_field.ctof('1234')
-        # self.assertEqual(outcome, '      1234')
         outcome = self._adapter._convert_condition('KUF_ULI', 'eq', '123')
         self.assertEqual(outcome[0], 'KUF_ULI')
         self.assertEqual(outcome[1]('123'), True)
@@ -503,6 +501,7 @@ class RFKAdapterTest(TestCase):
         self.assertEqual(outcome[1]('skafiskafnjak'), False)
 
     def test_field_strtoc(self):
+        """tests if string values get converted to column typed value correctly"""
         self._set_up()
         mock_field = self._adapter.header_fields['SIF_ULI']
         outcome = mock_field.strtoc('123')
@@ -519,6 +518,25 @@ class RFKAdapterTest(TestCase):
         mock_field = self._adapter.header_fields['KUF_ULI']
         outcome = mock_field.strtoc('1234')
         self.assertEqual(outcome, '1234')
+        mock_field = self._adapter.header_fields['KAS_ULI']
+        outcome = mock_field.strtoc('2.2')
+        self.assertEqual(outcome, 2.2)
+
+    def test_000_where(self):
+        """test _reading a single raw record filtered by a single condition"""
+        self._set_up()
+        outcome = self._adapter.where([('OTP_ULI', 'eq', '880')])
+        self.assertNotEqual(outcome, [])
+        self.assertEqual(outcome[0]['SIF_ULI'], 881)
+        self.assertEqual(outcome[0]['OTP_ULI'], '880')
+        outcome = self._adapter.where([
+            ('OBJ_ULI', 'eq', 10),
+            ('DOK_ULI', 'eq', 20),
+            ])
+        self.assertGreater(len(outcome), 0)
+        for record in outcome:
+            self.assertEqual(record['OBJ_ULI'], 10)
+            self.assertEqual(record['DOK_ULI'], 20)
 
 class RFKAdapterSlowTest(RFKAdapterTest):
     def __init__(self, *args, **kwds):

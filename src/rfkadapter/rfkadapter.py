@@ -360,11 +360,10 @@ class RFKAdapter:
 
         Written in order to facilitate external calls with conditions
         styled like: [('COL', 'gt', 'VALUE'), ('COL', 'lt', 'VALUE')]
-        conditions get type inferred and operators bacome lambdas
+        conditions get type inferred and operators go lambdas
         """
-        # conditions = self._convert_condition
-        # @TODO:HERE: write tests, impl
-        pass
+        converted_conditions = [self._convert_condition(*c) for c in conditions]
+        return self.filter(converted_conditions)
 
     def write(self, data):
         """Appends a new record to the table"""
