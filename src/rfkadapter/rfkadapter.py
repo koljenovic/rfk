@@ -96,8 +96,6 @@ class Field:
             return int(value) if value else None
         if self.ctype in [Type.FLOAT, Type.CURRENCY, Type.DOUBLE, Type.NUMERIC]:
             return float(value) if value else None
-        if self.ftype == Type.DATE:
-            return date.fromisoformat(value) if value else None
         return value if value else None
 
     def ftoc(self, value):
@@ -110,7 +108,7 @@ class Field:
             return value
         if self.ctype == Type.FLOAT:
             return value
-        if self.ftype == Type.DATE:
+        if self.ctype == Type.DATE:
             return value.isoformat() if value else value
         if self.ftype == self.ctype:
             return value
