@@ -297,7 +297,7 @@ class RFKAdapterTest(TestCase):
             { 'DAT_ULI': today, 'KUF_ULI': randval},
             [('OBJ_ULI', lambda x: x == 10),
             ('DOK_ULI', lambda x: x == 20),
-            ('SIF_ULI', lambda x: x == 915),
+            ('SIF_ULI', 'eq', '915'),
             ])
         self.assertEqual(success, True)
         outcome = self._adapter.filter([

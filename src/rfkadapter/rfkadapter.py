@@ -373,13 +373,19 @@ class RFKAdapter:
 
     def update(self, what, where):
         """Updates existing records, returns True on success"""
+        _where = []
+        for c in where:
+            if len(c) == 2:
+                _where.append(c)
+            if len(c) == 3:
+                _where.append(self._convert_condition(*c))
         fields = self._table._meta.fields
-        for field_name, constr in where:
+        for field_name, constr in _where:
             if field_name not in fields:
                 raise FieldError('No field with name %s in table %s', (field_name, self.table_name))
         for record in self._table:
             satisfies = True
-            for field_name, constr in where:
+            for field_name, constr in _where:
                 value = RFKAdapter._prepare_value(record[field_name])
                 value = self.header_fields[field_name].ftoc(value)
                 if not constr(value):
