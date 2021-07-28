@@ -3889,17 +3889,19 @@ class _Db3Memo(_DbfMemo):
                     raise DbfError("memo file appears to be corrupt: %r" % exc.args).from_exc(None)
 
     def _get_memo(self, block):
-        block = int(block)
-        self.meta.mfd.seek(block * self.meta.memo_size)
-        eom = -1
-        data = b''
-        while eom == -1:
-            newdata = self.meta.mfd.read(self.meta.memo_size)
-            if not newdata:
-                return data
-            data += newdata
-            eom = data.find(b'\x1a\x1a')
-        return data[:eom]
+        # block = int(block)
+        # self.meta.mfd.seek(block * self.meta.memo_size)
+        # eom = -1
+        # data = b''
+        # while eom == -1:
+        #     newdata = self.meta.mfd.read(self.meta.memo_size)
+        #     if not newdata:
+        #         return data
+        #     data += newdata
+        #     eom = data.find(b'\x1a\x1a')
+        # return data[:eom]
+        # @CHANGE: NUKED THE MEMO!
+        return b''
 
     def _put_memo(self, data):
         data = data

@@ -136,7 +136,7 @@ class RFKAdapter:
     def __init__(self, db_path, table_name, mode='-'):
         self.db_path = db_path
         self.table_name = table_name
-        self._table = dbf.Table(db_path + table_name, codepage='cp852', dbf_type='db3')
+        self._table = dbf.Table(db_path + table_name, codepage='cp852') # dbf_type='db3'
         self._table.open(mode=dbf.READ_WRITE if mode.lower() == 'w' else dbf.READ_ONLY)
         self._parse_headers()
 
