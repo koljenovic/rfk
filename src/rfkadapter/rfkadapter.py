@@ -161,8 +161,9 @@ class RFKAdapter:
     @staticmethod
     def _is_char_padded_string(value, length, pad=' '):
         """determines if and how the value is padded if it can be determined"""
-        if not isinstance(value, str):
+        if not type(value) in [str, bytes]:
             raise ValueError('%s is not CHAR type' % value)
+        value = value.decode('cp852') if isinstance(value, bytes) else value
         if not value.strip():
             return None, None
         if len(value) != length:
@@ -182,6 +183,7 @@ class RFKAdapter:
         Tested only on positive integers. Returns the paddiness and an assumed
         padding character, basically should work for left padded '0' and ' '.
         """
+        value = value.decode('cp852') if isinstance(value, bytes) else value
         int_value = RFKAdapter._char_to_int(value)
         if len(value) == length and int_value != None:
             str_value = str(int_value)
