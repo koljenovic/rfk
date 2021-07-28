@@ -255,8 +255,7 @@ class RFKAdapter:
 
     def _parse_headers(self):
         """Parses the fields from table headers"""
-        fields = self._table._meta.fields
-        self.header_fields = { field: Field(field, *self._table.field_info(field)[:3]) for field in fields }
+        self.header_fields = { _name: Field(_name, _prop[0], _prop[2], _prop[4]) for _name, _prop in self._table._meta.items() }
         base_name = os.path.splitext(self.table_name)[0]
         cache_path = os.path.join(self.db_path, base_name + '.json')
         if os.path.isfile(cache_path):

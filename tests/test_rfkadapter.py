@@ -25,8 +25,6 @@ import datetime
 from rfkadapter import RFKAdapter, Field, Type, FieldError
 from unittest import TestCase
 
-RUN_SLOW = True
-
 class RFKAdapterTest(TestCase):
     def __init__(self, *args, **kwds):
         self._db_path = os.path.dirname(os.path.realpath(__file__)) + '/data/'
@@ -168,11 +166,18 @@ class RFKAdapterTest(TestCase):
         outcome.is_padded, outcome.pad = self._adapter._is_char_column_padded_int(outcome)
         self.assertEqual(str(outcome), '<OBJ_ULI, C, 3, 0, True, 0, ?>')
 
-    def test_header_parsed(self):
+    def test_header_parsed_uliz(self):
         """tests if the headers gets parsed and if it gets parsed right"""
         self._set_up()
         target = { 'OBJ_ULI': '<OBJ_ULI, C, 3, 0, True, 0, I>', 'DOK_ULI': '<DOK_ULI, C, 2, 0, False, None, I>', 'SIF_ULI': '<SIF_ULI, C, 5, 0, True, 0, I>', 'GOT_ULI': '<GOT_ULI, C, 1, 0, False, None, I>', 'NAL_ULI': '<NAL_ULI, C, 3, 0, False, None, C>', 'DAT_ULI': '<DAT_ULI, D, 8, 0, None, None, D>', 'OTP_ULI': '<OTP_ULI, C, 20, 0, R,  , C>', 'NAO_ULI': '<NAO_ULI, C, 50, 0, None, None, X>', 'DAI_ULI': '<DAI_ULI, D, 8, 0, None, None, D>', 'MIS_ULI': '<MIS_ULI, C, 50, 0, None, None, X>', 'VAL_ULI': '<VAL_ULI, D, 8, 0, None, None, D>', 'DAN_ULI': '<DAN_ULI, N, 3, 0, None, None, N>', 'RBR_ULI': '<RBR_ULI, N, 4, 0, None, None, N>', 'KUF_ULI': '<KUF_ULI, C, 10, 0, L,  , C>', 'ZAD_ULI': '<ZAD_ULI, C, 3, 0, True, 0, I>', 'PAR_ULI': '<PAR_ULI, C, 7, 0, True, 0, I>', 'PRO_ULI': '<PRO_ULI, C, 3, 0, False, None, I>', 'TRG_ULI': '<TRG_ULI, C, 3, 0, True, 0, I>', 'KAS_ULI': '<KAS_ULI, N, 5, 2, None, None, F>', 'PUT_ULI': '<PUT_ULI, C, 3, 0, True, 0, I>', 'NAP_ULI': '<NAP_ULI, M, 10, 0, None, None, M>', 'LIK_ULI': '<LIK_ULI, L, 1, 0, None, None, L>', 'FIN_ULI': '<FIN_ULI, L, 1, 0, None, None, L>', 'L0_ULI': '<L0_ULI, L, 1, 0, None, None, L>', 'L1_ULI': '<L1_ULI, L, 1, 0, None, None, L>', 'L2_ULI': '<L2_ULI, L, 1, 0, None, None, L>', 'L3_ULI': '<L3_ULI, L, 1, 0, None, None, L>', 'L4_ULI': '<L4_ULI, L, 1, 0, None, None, L>', 'L5_ULI': '<L5_ULI, L, 1, 0, None, None, L>', 'L6_ULI': '<L6_ULI, L, 1, 0, None, None, L>', 'L7_ULI': '<L7_ULI, L, 1, 0, None, None, L>', 'L8_ULI': '<L8_ULI, L, 1, 0, None, None, L>', 'L9_ULI': '<L9_ULI, L, 1, 0, None, None, L>', 'L1A_ULI': '<L1A_ULI, L, 1, 0, None, None, L>', 'L2A_ULI': '<L2A_ULI, L, 1, 0, None, None, L>', 'L3A_ULI': '<L3A_ULI, L, 1, 0, None, None, L>', 'L4A_ULI': '<L4A_ULI, L, 1, 0, None, None, L>', 'L5A_ULI': '<L5A_ULI, L, 1, 0, None, None, L>', 'N1_ULI': '<N1_ULI, N, 1, 0, None, None, N>', 'N2_ULI': '<N2_ULI, N, 1, 0, None, None, N>', 'FIS_ULI': '<FIS_ULI, L, 1, 0, None, None, L>', 'REK_ULI': '<REK_ULI, L, 1, 0, None, None, L>', 'STO_ULI': '<STO_ULI, L, 1, 0, None, None, L>', 'FRA_ULI': '<FRA_ULI, C, 6, 0, True, 0, I>', 'FRR_ULI': '<FRR_ULI, C, 6, 0, True, 0, I>', 'MJE_ULI': '<MJE_ULI, C, 2, 0, None, None, X>', 'PAS_ULI': '<PAS_ULI, C, 10, 0, None, None, X>', 'DAS_ULI': '<DAS_ULI, D, 8, 0, None, None, D>', 'MTR_ULI': '<MTR_ULI, C, 7, 0, None, None, X>' }
         self.assertEqual(len(self._adapter.header_fields), len(target))
+        for k, v in self._adapter.header_fields.items():
+            self.assertEqual(str(v), target[k])
+
+    def test_header_parsed_adob(self):
+        """tests if the headers gets parsed and if it gets parsed right"""
+        self._set_up('ADOB.DBF')
+        target = { 'DOK_ADO': '<DOK_ADO, C, 2, 0, None, None, X>', 'PAR_ADO': '<PAR_ADO, C, 7, 0, None, None, X>', 'DAT_ADO': '<DAT_ADO, D, 8, 0, None, None, D>', 'OBJ_ADO': '<OBJ_ADO, C, 3, 0, None, None, X>', 'ULI_ADO': '<ULI_ADO, C, 4, 0, None, None, X>', 'VAL_ADO': '<VAL_ADO, D, 8, 0, None, None, D>', 'OPI_ADO': '<OPI_ADO, C, 30, 0, None, None, X>', 'IZN_ADO': '<IZN_ADO, N, 15, 2, None, None, F>', 'DUP_ADO': '<DUP_ADO, C, 1, 0, None, None, X>' }
         for k, v in self._adapter.header_fields.items():
             self.assertEqual(str(v), target[k])
 
@@ -541,11 +546,6 @@ class RFKAdapterTest(TestCase):
             self.assertEqual(record['OBJ_ULI'], 10)
             self.assertEqual(record['DOK_ULI'], 20)
 
-class RFKAdapterSlowTest(RFKAdapterTest):
-    def __init__(self, *args, **kwds):
-        super(RFKAdapterSlowTest, self).__init__(*args, **kwds)
-
-    @unittest.skipUnless(RUN_SLOW, "slow")
     def test_json_caching_and_restoring_parsed_headers(self):
         """tests whether header Field objects get cached and restored correctly"""
         self._set_up()
