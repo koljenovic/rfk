@@ -88,7 +88,7 @@ class Field:
             return pad * (length - len(value)) + value
         elif side == 'R':
             return value + pad * (length - len(value))
-        raise Exception('Undefined padding side %s.', side)
+        raise Exception('Undefined padding side %s.' % side)
 
     def strtoc(self, value):
         """best effort converts str values into ctype"""
@@ -101,7 +101,7 @@ class Field:
     def ftoc(self, value):
         """converts ftype values into ctype if possible"""
         if self.ctype == Type.NULL or self.ctype == Type.UNDEFINED:
-            raise ValueError('missing inferred type for Field %s', self.name)
+            raise ValueError('missing inferred type for Field %s' % self.name)
         if self.ctype == Type.INTEGER:
             return int(value) if value else None
         if self.ctype == Type.CHAR:
@@ -112,7 +112,7 @@ class Field:
             return value.isoformat() if value else value
         if self.ftype == self.ctype:
             return value
-        raise ValueError('undefined conversion method from ftype %s to ctype %s', (chr(self.ftype), chr(self.ctype)))
+        raise ValueError('undefined conversion method from ftype %s to ctype %s' % (chr(self.ftype), chr(self.ctype)))
 
     def ctof(self, value):
         """converst ctype values back into native ftype with padding and all"""
@@ -162,7 +162,7 @@ class RFKAdapter:
     def _is_char_padded_string(value, length, pad=' '):
         """determines if and how the value is padded if it can be determined"""
         if not isinstance(value, str):
-            raise ValueError('%s is not CHAR type', value)
+            raise ValueError('%s is not CHAR type' % value)
         if not value.strip():
             return None, None
         if len(value) != length:
@@ -289,7 +289,7 @@ class RFKAdapter:
         fields = self._table._meta.fields
         for field_name, constr in where:
             if field_name not in fields:
-                raise FieldError('No field with name %s in table %s', (field_name, self.table_name))
+                raise FieldError('No field with name %s in table %s' % (field_name, self.table_name))
                 return
         for record in self._table:
             satisfies = True
@@ -350,7 +350,7 @@ class RFKAdapter:
         if comparator in _map:
             return (column, _map[comparator])
         else:
-            raise ValueError('invalid comparator %s', comparator)
+            raise ValueError('invalid comparator %s' % comparator)
 
     def where(self, conditions=[]):
         """Convenience filter method
@@ -379,7 +379,7 @@ class RFKAdapter:
         fields = self._table._meta.fields
         for field_name, constr in _where:
             if field_name not in fields:
-                raise FieldError('No field with name %s in table %s', (field_name, self.table_name))
+                raise FieldError('No field with name %s in table %s' % (field_name, self.table_name))
         for record in self._table:
             satisfies = True
             for field_name, constr in _where:
