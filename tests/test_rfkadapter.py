@@ -333,6 +333,12 @@ class RFKAdapterTest(TestCase):
         self.assertNotEqual(outcome, [])
         for record in outcome:
             self.assertEqual(record['KUF_ULI'], randval)
+        # CASE: no object exists for filter
+        success = self._adapter.update(
+            { 'KUF_ULI': 12345},
+            [('OBJ_ULI', lambda x: x == 32123),
+            ])
+        self.assertEqual(success, False)
 
     def test_is_char_column_string(self):
         """tests determining whether a char column is a string column"""

@@ -382,6 +382,7 @@ class RFKAdapter:
         for field_name, constr in _where:
             if field_name not in fields:
                 raise FieldError('No field with name %s in table %s' % (field_name, self.table_name))
+        exists = False
         for record in self._table:
             satisfies = True
             for field_name, constr in _where:
@@ -391,10 +392,11 @@ class RFKAdapter:
                     satisfies = False
                     break
             if satisfies:
+                exists = True
                 for k, v in what.items():
                     with record:
                         record[k] = self.header_fields[k].ctof(v)
-        return True
+        return exists
 
     def _cache_headers(self):
         """Caches parsed headers to file because parsing is time demanding
