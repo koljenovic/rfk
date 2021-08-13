@@ -427,9 +427,12 @@ class RFKAdapter:
     def write(self, data):
         """Appends a new record to the table"""
         line = []
-        for k, v in data.items():
-            if self.header_fields[k].ftype != Type.MEMO:
-                line.append(self.header_fields[k].ctox(v))
+        for _, field in self.header_fields.items():
+            if field.name in data:
+                if field.ftype != Type.MEMO:
+                    line.append(field.ctox(data[field.name]))
+            else:
+                line.append(field.ctox(None))
         fd, fname = None, None
         try:
             fd, fname = tempfile.mkstemp(prefix='rfk', suffix='.csv', text=True)
