@@ -1,21 +1,22 @@
-FUNCTION MAIN(path, file)
+FUNCTION MAIN(path, base, csvfile)
     LOCAL i
     Set(_SET_FILECASE, 2)
-    IF PCount() < 2
-        OutStd("400 ERROR. USAGE e.g: reindex ABS_PATH NAME.DBF [INDEX01.NTX ...]")
+    IF PCount() < 3
+        OutStd("400 ERROR. USAGE e.g: append ABS_DBPATH NAME.DBF ABSCSVFILEPATH [INDEX01.NTX ...]")
         RETURN 1
     ENDIF
     Set(_SET_DEFAULT, hb_DirSepToOS(path))
-    USE (file)
+    USE (base)
     IF !FLock()
         OutStd("500 ERROR. LOCKED")
     ENDIF
-    FOR i := 3 TO PCount()
+    FOR i := 4 TO PCount()
         SET INDEX TO (hb_PValue(i)) ADDITIVE
         IF !FLock()
             OutStd("500 ERROR. LOCKED")
         ENDIF
     NEXT
-    REINDEX
+    Set(_SET_FILECASE, 0)
+    APPEND FROM (csvfile) DELIMITED
     OutStd("200 SUCCESS")
     RETURN 0
