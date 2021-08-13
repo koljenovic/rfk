@@ -115,7 +115,7 @@ class RFKAdapterTest(TestCase):
 
     def test_record_append(self):
         """test appending a single record to the table"""
-        self._set_up('ULIZ.DBF', 'W')
+        self._set_up('ULIZ.DBF')
         sample_record = {'OBJ_ULI': '010', 'DOK_ULI': '20', 'SIF_ULI': '00000', 'GOT_ULI': None, 'NAL_ULI': 'ADM', 'DAT_ULI': dbf.DateTime(2021, 6, 14), 'OTP_ULI': '225883', 'NAO_ULI': None, 'DAI_ULI': dbf.DateTime(2021, 6, 14), 'MIS_ULI': None, 'VAL_ULI': dbf.DateTime(2021, 6, 14), 'DAN_ULI': 0, 'RBR_ULI': 2, 'KUF_ULI': '1234', 'ZAD_ULI': '001', 'PAR_ULI': '0196552', 'PRO_ULI': None, 'TRG_ULI': None, 'KAS_ULI': 0, 'PUT_ULI': '001', 'NAP_ULI': '', 'LIK_ULI': None, 'FIN_ULI': None, 'L0_ULI': False, 'L1_ULI': False, 'L2_ULI': False, 'L3_ULI': False, 'L4_ULI': False, 'L5_ULI': False, 'L6_ULI': False, 'L7_ULI': False, 'L8_ULI': False, 'L9_ULI': False, 'L1A_ULI': None, 'L2A_ULI': None, 'L3A_ULI': None, 'L4A_ULI': None, 'L5A_ULI': None, 'N1_ULI': 0, 'N2_ULI': 0, 'FIS_ULI': None, 'REK_ULI': None, 'STO_ULI': None, 'FRA_ULI': None, 'FRR_ULI': None, 'MJE_ULI': None, 'PAS_ULI': None, 'DAS_ULI': None, 'MTR_ULI': None}
         result = self._adapter._read([
             ('OBJ_ULI', lambda x: x == '010'),
@@ -124,18 +124,13 @@ class RFKAdapterTest(TestCase):
         fresh_row_id = str(max([int(record['SIF_ULI']) for record in result]) + 1).zfill(5)
         sample_record['SIF_ULI'] = fresh_row_id
         self._adapter.write(sample_record)
-        result = self._adapter._read([
+        self._adapter = None
+        self._set_up('ULIZ.DBF')
+        result = self._adapter.read([
             ('OBJ_ULI', lambda x: x == '010'),
             ('DOK_ULI', lambda x: x == '20'),
-            ], raw_result=True)
-        self.assertEqual(result[-1]['SIF_ULI'], fresh_row_id)
-        for k, v in sample_record.items():
-            field = self._adapter.header_fields[k]
-            if field.ftype == Type.CHAR:
-                if v:
-                    self.assertEqual(v, result[-1][k])
-                else:
-                    self.assertEqual(bool(v), bool(result[-1][k].strip()))
+            ])
+        self.assertEqual(result[-1]['SIF_ULI'], int(fresh_row_id))
 
     def test_determine_char_field_is_int(self):
         """tests determining if the char field is an integer value"""
@@ -271,27 +266,29 @@ class RFKAdapterTest(TestCase):
 
     def test_appending_mixed_types_record(self):
         """test appending a mismatched types record to the table"""
-        self._set_up('ULIZ.DBF', 'W')
+        self._set_up('ULIZ.DBF')
+        # @TODO: testirati dodavanje afrikata i coded karaktera
         sample_record = {'OBJ_ULI': 10, 'DOK_ULI': 20, 'SIF_ULI': 0, 'GOT_ULI': None, 'NAL_ULI': 'ADM', 'DAT_ULI': '2021-07-07', 'OTP_ULI': '225883', 'NAO_ULI': None, 'DAI_ULI': '2021-06-14', 'MIS_ULI': None, 'VAL_ULI': dbf.DateTime(2021, 6, 14), 'DAN_ULI': 0, 'RBR_ULI': 2, 'KUF_ULI': '1234', 'ZAD_ULI': '001', 'PAR_ULI': '0196552', 'PRO_ULI': None, 'TRG_ULI': None, 'KAS_ULI': 0, 'PUT_ULI': '001', 'NAP_ULI': '', 'LIK_ULI': None, 'FIN_ULI': None, 'L0_ULI': False, 'L1_ULI': False, 'L2_ULI': False, 'L3_ULI': False, 'L4_ULI': False, 'L5_ULI': False, 'L6_ULI': False, 'L7_ULI': False, 'L8_ULI': False, 'L9_ULI': False, 'L1A_ULI': None, 'L2A_ULI': None, 'L3A_ULI': None, 'L4A_ULI': None, 'L5A_ULI': None, 'N1_ULI': 0, 'N2_ULI': 0, 'FIS_ULI': None, 'REK_ULI': None, 'STO_ULI': None, 'FRA_ULI': None, 'FRR_ULI': None, 'MJE_ULI': None, 'PAS_ULI': None, 'DAS_ULI': None, 'MTR_ULI': None}
         result = self._adapter._read([
             ('OBJ_ULI', lambda x: x == '010'),
             ('DOK_ULI', lambda x: x == '20'),
             ])
         fresh_row_id = str(max([int(record['SIF_ULI']) for record in result]) + 1).zfill(5)
-        sample_record['SIF_ULI'] = fresh_row_id
+        sample_record['SIF_ULI'] = int(fresh_row_id)
+        # @HERE@TODO: fix the API
         self._adapter.write(sample_record)
-        result = self._adapter._read([
+        self._adapter = None
+        self._set_up('ULIZ.DBF')
+        result = self._adapter.read([
             ('OBJ_ULI', lambda x: x == '010'),
             ('DOK_ULI', lambda x: x == '20'),
-            ], raw_result=True)
-        self.assertEqual(result[-1]['SIF_ULI'], fresh_row_id)
-        for k, v in sample_record.items():
-            field = self._adapter.header_fields[k]
-            if field.ftype == Type.CHAR:
-                if v:
-                    self.assertEqual(v, result[-1][k])
-                else:
-                    self.assertEqual(bool(v), bool(result[-1][k].strip()))
+            ])
+        self.assertEqual(result[-1]['SIF_ULI'], int(fresh_row_id))
+        # NOTE: Ensures indexes get updated as well
+        clock = str(os.path.getmtime(self._db_path + 'ULIZ.DBF'))[:9]
+        self.assertEqual(str(os.path.getmtime(self._db_path + 'ULIZ01.NTX'))[:9], clock)
+        self.assertEqual(str(os.path.getmtime(self._db_path + 'ULIZ02.NTX'))[:9], clock)
+        self.assertEqual(str(os.path.getmtime(self._db_path + 'ULIZ02.NTX'))[:9], clock)
 
     def test_updating_single_record(self):
         """tests updating a single existing record"""
@@ -564,6 +561,49 @@ class RFKAdapterTest(TestCase):
             headers = json.load(fp)
             for field_name, field_value in headers.items():
                 self.assertEqual(str(Field(**field_value)), str(self._adapter.header_fields[field_name]))
+
+    def test_column_to_export_conversion(self):
+        """tests if ctype values get converted to export format correctly"""
+        self._set_up()
+        mock_field = self._adapter.header_fields['L2_ULI']
+        outcome = mock_field.ctox(True)
+        self.assertEqual(outcome, 'T')
+        outcome = mock_field.ctox(False)
+        self.assertEqual(outcome, 'F')
+        mock_field = self._adapter.header_fields['OBJ_ULI']
+        outcome = mock_field.ctox(10)
+        self.assertEqual(outcome, '"010"')
+        mock_field = self._adapter.header_fields['DOK_ULI']
+        outcome = mock_field.ctox(20)
+        self.assertEqual(outcome, '"20"')
+        mock_field = self._adapter.header_fields['SIF_ULI']
+        outcome = mock_field.ctox(123)
+        self.assertEqual(outcome, '"00123"')
+        mock_field = self._adapter.header_fields['NAL_ULI']
+        outcome = mock_field.ctox('ADM')
+        self.assertEqual(outcome, '"ADM"')
+        mock_field = self._adapter.header_fields['OTP_ULI']
+        outcome = mock_field.ctox('225883')
+        self.assertEqual(outcome, '"225883"')
+        mock_field = self._adapter.header_fields['KUF_ULI']
+        outcome = mock_field.ctox('1234')
+        self.assertEqual(outcome, '"      1234"')
+        mock_field = self._adapter.header_fields['DAT_ULI']
+        outcome = mock_field.ctox('2021-07-09')
+        self.assertEqual(outcome, '20210709')
+        mock_field = self._adapter.header_fields['VAL_ULI']
+        outcome = mock_field.ctox('2021-07-09')
+        self.assertEqual(outcome, '20210709')
+        mock_field = self._adapter.header_fields['MIS_ULI']
+        outcome = mock_field.ctox(None)
+        self.assertEqual(outcome, '""')
+
+    def test_indices_get_found(self):
+        """tests whether index files get found correctly"""
+        self._set_up()
+        self.assertEqual('ULIZ01' in self._adapter.index_files, True)
+        self.assertEqual('ULIZ02' in self._adapter.index_files, True)
+        self.assertEqual('ULIZ03' in self._adapter.index_files, True)
 
 if __name__ == '__main__':
     unittest.main(failfast=True)

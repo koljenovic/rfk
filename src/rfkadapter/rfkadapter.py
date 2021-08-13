@@ -37,11 +37,20 @@ import json
 import mdbf as dbf
 import os
 import re
+import tempfile
+import subprocess 
 
 from collections import defaultdict
 from datetime import date
+from mdbf import DateTime as datetime
 
 class FieldError(Exception):
+    pass
+
+class HarbourError(Exception):
+    pass
+
+class FileError(Exception):
     pass
 
 class Type:
@@ -131,14 +140,61 @@ class Field:
                 return date.fromisoformat(value)
         return value
 
+    @staticmethod
+    def quote(value, char='"'):
+        return char + value.replace(char, f'\\{char}') + char
+
+    def ctox(self, value):
+        """converst ctype values into export csv compatible values"""
+        if self.ftype == Type.LOGICAL:
+            return 'T' if value else 'F'
+        if self.ftype == Type.CHAR:
+            if self.ctype == Type.INTEGER:
+                if isinstance(value, int):
+                    if self.is_padded and self.is_padded != 'R':
+                        return Field.quote(self._pad(str(value)))
+                if value != None:
+                    return Field.quote(str(value))
+            if self.ctype == Type.CHAR:
+                if isinstance(value, str):
+                    if self.is_padded and self.is_padded != 'R':
+                        return Field.quote(self._pad(value))
+                    else:
+                        return Field.quote(value)
+        if self.ftype == Type.DATE:
+            if isinstance(value, str):
+                return date.fromisoformat(value).strftime('%Y%m%d')
+            if isinstance(value, date) or isinstance(value, datetime):
+                return value.strftime('%Y%m%d')
+        try:
+            return str(value) if value != None else Field.quote('')
+        except:
+            return Field.quote('')
+
 # @TODO-EP-002: Determine mandatory header fields
 class RFKAdapter:
-    def __init__(self, db_path, table_name, mode='-'):
-        self.db_path = db_path
-        self.table_name = table_name
-        self._table = dbf.Table(db_path + table_name, codepage='cp852') # dbf_type='db3'
-        self._table.open(mode=dbf.READ_WRITE if mode.lower() == 'w' else dbf.READ_ONLY)
-        self._parse_headers()
+    def __init__(self, db_path, table_name, mode='-', index_suffix='ntx'):
+        if os.path.isfile(db_path + table_name):
+            self.db_path = db_path
+            self.table_name = table_name
+            self.index_suffix = index_suffix
+            self.index_files = self._locate_index_files()
+            self._table = dbf.Table(db_path + table_name, codepage='cp852') # dbf_type='db3'
+            self._table.open(mode=dbf.READ_WRITE if mode.lower() == 'w' else dbf.READ_ONLY)
+            self._parse_headers()
+        else:
+            raise FileError('No such database exists.')
+
+    def _locate_index_files(self):
+        """Finds index files for db if they exist, **VERY MUCH** case sensitive"""
+        indices = []
+        with os.scandir(self.db_path) as d:
+            for e in d:
+                if e.is_file():
+                    if e.name.startswith(self.table_name.split('.')[0]):
+                        if e.name.lower().endswith('.' + self.index_suffix.lower()):
+                            indices.append(e.name.split('.')[0])
+        return indices
 
     def __del__(self):
         if hasattr(self, '_table') and self._table.status != dbf.CLOSED:
@@ -317,9 +373,13 @@ class RFKAdapter:
                 result.append(result_record)
         return result
 
+    def read(self, where=[]):
+        """Opinionated type inferred read"""
+        return self._read(infer_type=True)
+
     def read_all(self):
         """Returns all the DBF values, type inferred"""
-        return self._read()
+        return self._read(infer_type=True)
 
     def filter(self, where=[]):
         """Returns all filtered DBF values, best effort type inferred
@@ -366,9 +426,22 @@ class RFKAdapter:
 
     def write(self, data):
         """Appends a new record to the table"""
+        line = []
         for k, v in data.items():
-            data[k] = self.header_fields[k].ctof(v)
-        self._table.append(data)
+            if self.header_fields[k].ftype != Type.MEMO:
+                line.append(self.header_fields[k].ctox(v))
+        fd, fname = None, None
+        try:
+            fd, fname = tempfile.mkstemp(prefix='rfk', suffix='.csv', text=True)
+            f = os.fdopen(fd, 'w')
+            f.write(','.join(line))
+            f.close()
+            ext = subprocess.run(["append", self.db_path, self.table_name, fname, *self.index_files], timeout=10, text=True, capture_output=True)
+            if ext.returncode != 0:
+                raise HarbourError(ext.stderr)
+        finally:
+            if fname:
+                os.remove(fname)
 
     def update(self, what, where):
         """Updates existing records, returns True on success"""
