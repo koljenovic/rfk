@@ -439,7 +439,7 @@ class RFKAdapter:
             f = os.fdopen(fd, 'w')
             f.write(','.join(line))
             f.close()
-            ext = subprocess.run(["append", self.db_path, self.table_name, fname, *self.index_files], timeout=10, text=True, capture_output=True)
+            ext = subprocess.run(["append", self.db_path, self.table_name, fname, *self.index_files, '//noalert'], timeout=10, text=True, capture_output=True)
             if ext.returncode != 0:
                 raise HarbourError(ext.stderr)
         finally:

@@ -1,1 +1,1 @@
-from .rfkadapter import RFKAdapter, Field, Type, FieldError
+from .rfkadapter import RFKAdapter, Field, Type, FieldError, HarbourError
