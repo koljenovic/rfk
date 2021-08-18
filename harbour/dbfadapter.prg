@@ -11,7 +11,7 @@ FUNCTION MAIN(command)
 
     DO CASE
         CASE Upper(command) = "APPEND"
-            APPEND()
+            APPEND(args)
         CASE Upper(command) = "EXPORT"
             EXPORT(args)
         CASE Upper(command) = "HEAD"
