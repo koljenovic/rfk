@@ -34,15 +34,14 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 import json
-import mdbf as dbf
 import os
 import re
 import tempfile
 import subprocess 
+import csv
 
 from collections import defaultdict
-from datetime import date
-from mdbf import DateTime as datetime
+from datetime import date, datetime
 
 class FieldError(Exception):
     pass
@@ -56,19 +55,19 @@ class FileError(Exception):
 class Type:
     NULL = ord('?') # no type inferrence has been attempted
     UNDEFINED = ord('X') # type inferrence failed
-    CHAR = int(dbf.FieldType.CHAR)
-    CURRENCY = int(dbf.FieldType.CURRENCY)
-    DATE = int(dbf.FieldType.DATE)
-    DATETIME = int(dbf.FieldType.DATETIME)
-    DOUBLE = int(dbf.FieldType.DOUBLE)
-    FLOAT = int(dbf.FieldType.FLOAT)
-    GENERAL = int(dbf.FieldType.GENERAL)
-    INTEGER = int(dbf.FieldType.INTEGER)
-    LOGICAL = int(dbf.FieldType.LOGICAL)
-    MEMO = int(dbf.FieldType.MEMO)
-    NUMERIC = int(dbf.FieldType.NUMERIC)
-    PICTURE = int(dbf.FieldType.PICTURE)
-    TIMESTAMP = int(dbf.FieldType.TIMESTAMP)
+    CHAR = ord('C')
+    CURRENCY = ord('Y')
+    DATE = ord('D')
+    DATETIME = ord('T')
+    DOUBLE = ord('B')
+    FLOAT = ord('F')
+    GENERAL = ord('G')
+    INTEGER = ord('I')
+    LOGICAL = ord('L')
+    MEMO = ord('M')
+    NUMERIC = ord('N')
+    PICTURE = ord('P')
+    TIMESTAMP = ord('@')
 
 class Field:
     """Field class represents the meta DBF header field"""
@@ -86,6 +85,20 @@ class Field:
 
     def is_type(self, ftype):
         return self.ftype == ftype
+
+    @staticmethod
+    def dtoiso(value):
+        if isinstance(value, date) or isinstance(value, datetime):
+            return value.isoformat()
+        else:
+            return date(int(value[:4]), int(value[4:6]), int(value[6:8])).isoformat()
+
+    @staticmethod
+    def isotod(value):
+        if isinstance(value, date) or isinstance(value, datetime):
+            return value.strftime('%Y%m%d')
+        else:
+            return date.fromisoformat(value).strftime('%Y%m%d')
 
     def _pad(self, value, length=None, pad=None, side=None):
         length = self.length if not length else length
@@ -111,6 +124,10 @@ class Field:
         """converts ftype values into ctype if possible"""
         if self.ctype == Type.NULL or self.ctype == Type.UNDEFINED:
             raise ValueError('missing inferred type for Field %s' % self.name)
+        if self.ctype == Type.LOGICAL:
+            if isinstance(value, str):
+                return True if value == 'T' else False
+            return value
         if self.ctype == Type.INTEGER:
             return int(value) if value else None
         if self.ctype == Type.CHAR:
@@ -118,13 +135,17 @@ class Field:
         if self.ctype == Type.FLOAT:
             return value
         if self.ctype == Type.DATE:
-            return value.isoformat() if value else value
+            return Field.dtoiso(value) if value and isinstance(value, str) and len(value) == 8 else value
         if self.ftype == self.ctype:
             return value
         raise ValueError('undefined conversion method from ftype %s to ctype %s' % (chr(self.ftype), chr(self.ctype)))
 
     def ctof(self, value):
         """converst ctype values back into native ftype with padding and all"""
+        if self.ftype == Type.INTEGER:
+            return int(value)
+        if self.ftype == Type.NUMERIC:
+            return float(value)
         if self.ftype == Type.CHAR:
             if self.ctype == Type.INTEGER:
                 if isinstance(value, int):
@@ -132,12 +153,18 @@ class Field:
                         return self._pad(str(value))
                     else:
                         return str(value)
-            elif self.ctype == Type.CHAR:
-                if self.is_padded and isinstance(value, str):
-                    return self._pad(value)
+            if self.is_padded and isinstance(value, str):
+                return self._pad(value)
         if self.ftype == Type.DATE:
             if isinstance(value, str):
-                return date.fromisoformat(value)
+                if len(value) == 8:
+                    return Field.dtoiso(value)
+                if len(value) == 10:
+                    return value
+            raise ValueError('Incorrect date value: %s' % value)
+        if self.ftype == Type.LOGICAL:
+            if isinstance(value, str):
+                return True if value == 'T' else False
         return value
 
     @staticmethod
@@ -163,27 +190,137 @@ class Field:
                         return Field.quote(value)
         if self.ftype == Type.DATE:
             if isinstance(value, str):
-                return date.fromisoformat(value).strftime('%Y%m%d')
+                return Field.isotod(value)
             if isinstance(value, date) or isinstance(value, datetime):
-                return value.strftime('%Y%m%d')
+                return Field.isotod(value)
         try:
             return str(value) if value != None else Field.quote('')
         except:
             return Field.quote('')
 
-# @TODO-EP-002: Determine mandatory header fields
-class RFKAdapter:
+class MetaRecord:
+    def __init__(self, header_fields, record):
+        self._header_fields = header_fields
+        self._record = record
+
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            if key in self._header_fields:
+                return self._record[self._header_fields.index(key)]
+            else:
+                raise IndexError
+        elif isinstance(key, int):
+            if key < len(self._header_fields):
+                return self._record[key]
+            else:
+                raise IndexError
+        raise TypeError
+
+class DBFIterator:
+    def __init__(self, records, header_fields):
+        self._records = records
+        self._header_fields = header_fields
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if len(self._records) > 0:
+            return MetaRecord(self._header_fields, self._records.pop(0))
+        else:
+            raise StopIteration
+
+_EXE = '/home/koljenovic/code/refko/rfk/harbour/dbfadapter'
+
+class DBFAdapter:
     def __init__(self, db_path, table_name, mode='-', index_suffix='ntx'):
         if os.path.isfile(db_path + table_name):
+            self._table = self
             self.db_path = db_path
             self.table_name = table_name
             self.index_suffix = index_suffix
             self.index_files = self._locate_index_files()
-            self._table = dbf.Table(db_path + table_name, codepage='cp852') # dbf_type='db3'
-            self._table.open(mode=dbf.READ_WRITE if mode.lower() == 'w' else dbf.READ_ONLY)
-            self._parse_headers()
+            self._records = None
+            self._meta = None
         else:
             raise FileError('No such database exists.')
+
+    @staticmethod
+    def _head(db_path, table_name, _EXE=_EXE):
+        table_name = table_name.split('.')[0]
+        headers, f, fd, fname = None, None, None, None
+        try:
+            fd, fname = tempfile.mkstemp(prefix='dbfh', suffix='.json', text=True)
+            ext = subprocess.run([_EXE, "head", db_path, table_name, fname, '//noalert'], timeout=10, text=True, capture_output=True)
+            if ext.returncode != 0:
+                raise HarbourError(ext.stderr)
+            f = os.fdopen(fd, 'r')
+            headers = f.read()
+        finally:
+            if f:
+                f.close()
+            if fname:
+                os.remove(fname)
+        return headers
+
+    @staticmethod
+    def _export(db_path, table_name, index_files, _EXE=_EXE):
+        table_name = table_name.split('.')[0]
+        records, f, fd, fname = [], None, None, None
+        try:
+            fd, fname = tempfile.mkstemp(prefix='dbfx', suffix='.csv', text=True)
+            ext = subprocess.run([_EXE, "export", db_path, table_name, fname, *index_files, '//noalert'], timeout=10, text=True, capture_output=True)
+            if ext.returncode != 0:
+                raise HarbourError(ext.stderr)
+            f = os.fdopen(fd, 'r')
+            csvf = csv.reader(f)
+            for record in csvf:
+                records.append(record)
+        finally:
+            if f:
+                f.close()
+            if fname:
+                os.remove(fname)
+        return records[:-1]
+
+    @staticmethod
+    def _append(line, db_path, table_name, index_files, _EXE=_EXE):
+        table_name = table_name.split('.')[0]
+        f, fd, fname = None, None, None
+        try:
+            fd, fname = tempfile.mkstemp(prefix='dbfa', suffix='.csv', text=True)
+            f = os.fdopen(fd, 'w')
+            f.write(','.join(line))
+            f.close()
+            ext = subprocess.run([_EXE, "append", db_path, table_name, fname, *index_files, '//noalert'], timeout=10, text=True, capture_output=True)
+            if ext.returncode != 0:
+                raise HarbourError(ext.stderr)
+        finally:
+            if f:
+                f.close()
+            if fname:
+                os.remove(fname)
+        return True
+
+    # @TODO: rewrite these static interface methods as decorators when not too lazy
+    @staticmethod
+    def _update(update_package, db_path, table_name, index_files, _EXE=_EXE):
+        table_name = table_name.split('.')[0]
+        f, fd, fname = None, None, None
+        try:
+            fd, fname = tempfile.mkstemp(prefix='dbfu', suffix='.json', text=True)
+            f = os.fdopen(fd, 'w')
+            data = json.dump(update_package, f)
+            f.close()
+            ext = subprocess.run([_EXE, "update", db_path, table_name, fname, *index_files, '//noalert'], timeout=10, text=True, capture_output=True)
+            if ext.returncode != 0:
+                raise HarbourError(ext.stderr)
+        finally:
+            if f:
+                f.close()
+            if fname:
+                os.remove(fname)
+        return True
 
     def _locate_index_files(self):
         """Finds index files for db if they exist, **VERY MUCH** case sensitive"""
@@ -196,9 +333,30 @@ class RFKAdapter:
                             indices.append(e.name.split('.')[0])
         return indices
 
-    def __del__(self):
-        if hasattr(self, '_table') and self._table.status != dbf.CLOSED:
-            self._table.close()
+    def _parse_meta(self):
+        header = json.loads(DBFAdapter._head(self.db_path, self.table_name))
+        header = [x[1:-1].split(',') for x in header]
+        header = [[y.strip() for y in x] for x in header]
+        self._meta = { x[0]: (x[0], ord(x[1]), int(x[2]), int(x[3])) for x in header }
+
+    def __iter__(self):
+        if not self._meta:
+            self._parse_meta()
+        records = DBFAdapter._export(self.db_path, self.table_name, self.index_files)
+        return DBFIterator(records, [k for k, v in self._meta.items() if v[1] != Type.MEMO] )
+
+    def field_info(self, field_name):
+        return self._meta[field_name][1:] if self._meta else None
+
+# @TODO-EP-002: Determine mandatory header fields
+class RFKAdapter(DBFAdapter):
+    def __init__(self, db_path, table_name, mode='-', index_suffix='ntx', with_headers=True):
+        super(RFKAdapter, self).__init__(db_path, table_name, mode, index_suffix)
+        self._table = self
+        base_name = os.path.splitext(self.table_name)[0]
+        self._cache_path = os.path.join(self.db_path, base_name + '.json')
+        if with_headers:
+            self._parse_headers()
 
     @staticmethod
     def _prepare_value(value):
@@ -311,12 +469,13 @@ class RFKAdapter:
                 return False, None
         return is_strings, None
 
-    def _parse_headers(self):
+    def _parse_headers(self, flush=False):
         """Parses the fields from table headers"""
-        self.header_fields = { _name: Field(_name, _prop[0], _prop[2], _prop[4]) for _name, _prop in self._table._meta.items() }
-        base_name = os.path.splitext(self.table_name)[0]
-        cache_path = os.path.join(self.db_path, base_name + '.json')
-        if os.path.isfile(cache_path):
+        if flush and os.path.isfile(self._cache_path):
+            self._flush_headers()
+        self._parse_meta()
+        self.header_fields = { _name: Field(_name, _prop[1], _prop[2], _prop[3]) for _name, _prop in self._table._meta.items() if _prop[1] != Type.MEMO }
+        if os.path.isfile(self._cache_path):
             self._restore_headers()
         else:
             for field in self.header_fields.values():
@@ -335,6 +494,7 @@ class RFKAdapter:
                     field.ctype = Type.FLOAT
                 else:
                     field.ctype = field.ftype
+            self._cache_headers()
 
     def _read(self, where=[], raw_result=False, infer_type=False):
         """Read, fetch and filter from RFK table
@@ -343,8 +503,9 @@ class RFKAdapter:
         without any further prep.
         - `infer_type` flag forces using inferred types everywhere
         """
+        # @TODO:R - REFACTOR, JSON FILTERS
         result = []
-        fields = self._table._meta.fields
+        fields = [k for k, v in self._meta.items() if v[1] != Type.MEMO]
         for field_name, constr in where:
             if field_name not in fields:
                 raise FieldError('No field with name %s in table %s' % (field_name, self.table_name))
@@ -375,7 +536,7 @@ class RFKAdapter:
 
     def read(self, where=[]):
         """Opinionated type inferred read"""
-        return self._read(infer_type=True)
+        return self._read(where=where, infer_type=True)
 
     def read_all(self):
         """Returns all the DBF values, type inferred"""
@@ -421,6 +582,7 @@ class RFKAdapter:
         styled like: [('COL', 'gt', 'VALUE'), ('COL', 'lt', 'VALUE')]
         conditions get type inferred and operators go lambdas
         """
+        # @TODO: check columns exists before passing on
         converted_conditions = [self._convert_condition(*c) for c in conditions]
         return self.filter(converted_conditions)
 
@@ -433,64 +595,57 @@ class RFKAdapter:
                     line.append(field.ctox(data[field.name]))
             else:
                 line.append(field.ctox(None))
-        fd, fname = None, None
-        try:
-            fd, fname = tempfile.mkstemp(prefix='rfk', suffix='.csv', text=True)
-            f = os.fdopen(fd, 'w')
-            f.write(','.join(line))
-            f.close()
-            ext = subprocess.run(["append", self.db_path, self.table_name, fname, *self.index_files, '//noalert'], timeout=10, text=True, capture_output=True)
-            if ext.returncode != 0:
-                raise HarbourError(ext.stderr)
-        finally:
-            if fname:
-                os.remove(fname)
+        self._append(line, self.db_path, self.table_name, self.index_files)
 
     def update(self, what, where):
         """Updates existing records, returns True on success"""
+        _FNAME, _COMP, _VALUE = 0, 1, 2
         _where = []
-        for c in where:
-            if len(c) == 2:
-                _where.append(c)
-            if len(c) == 3:
-                _where.append(self._convert_condition(*c))
-        fields = self._table._meta.fields
-        for field_name, constr in _where:
-            if field_name not in fields:
-                raise FieldError('No field with name %s in table %s' % (field_name, self.table_name))
-        exists = False
-        for record in self._table:
-            satisfies = True
-            for field_name, constr in _where:
-                value = RFKAdapter._prepare_value(record[field_name])
-                value = self.header_fields[field_name].ftoc(value)
-                if not constr(value):
-                    satisfies = False
-                    break
-            if satisfies:
-                exists = True
-                for k, v in what.items():
-                    with record:
-                        record[k] = self.header_fields[k].ctof(v)
-        return exists
+        if not self.header_fields:
+            raise ValueError('header_fields not initialized, run self._parse_headers first!')
+        comparators = ['lt', 'gt', 'lte', 'gte', 'eq', 'neq', 'si', 's', 'x']
+        for field_name, new_value in what.items():
+            if field_name not in self.header_fields.keys():
+                raise FieldError('No field with name %s in table %s to update' % (field_name, self.table_name))
+            what[field_name] = self.header_fields[field_name].ctof(new_value)
+        for condition in where:
+            if len(condition) != 3:
+                raise TypeError('Invalid filter. (NOTE: Old style lambda filters are deprecated, use JSON filters)')
+            # @TODO: these validators should be moved upstream
+            # if not isinstance(condition, dict) or \
+            #         'column_name' not in condition.keys() or \
+            #         'comparator' not in condition.keys() or \
+            #         'value' not in condition.keys():
+            #     raise TypeError('Invalid filter.')
+            if condition[_COMP] not in comparators:
+                raise ValueError('Invalid filter condition.')
+            if condition[_FNAME] not in self.header_fields.keys():
+                raise FieldError('No field with name %s in table %s' % (condition[_FNAME], self.table_name))
+            _where.append({
+                'column_name': condition[_FNAME],
+                'comparator': condition[_COMP],
+                'value': self.header_fields[condition[_FNAME]].ctof(condition[_VALUE])})
+        return DBFAdapter._update({'what': what, 'where': _where}, self.db_path, self.table_name, self.index_files)
 
     def _cache_headers(self):
         """Caches parsed headers to file because parsing is time demanding
 
         @TODO-EP-001: update cache on structural changes, ATM this is unneccessary,
-        flush manually by deleting *.json
+        flush manually by deleting *.json or calling _parse_headers with flush_cache
         """
-        base_name = os.path.splitext(self.table_name)[0]
-        json_path = os.path.join(self.db_path, base_name + '.json')
-        with open(json_path, 'w') as fp:
+        with open(self._cache_path, 'w') as fp:
             headers = { field.name: field.__dict__ for field in self.header_fields.values() }
             json.dump(headers, fp)
 
+    def _flush_headers(self):
+        self.header_fields = None
+        if os.path.isfile(self._cache_path):
+            os.remove(self._cache_path)
+
     def _restore_headers(self):
         """Restores header fields from cache"""
-        base_name = os.path.splitext(self.table_name)[0]
-        json_path = os.path.join(self.db_path, base_name + '.json')
-        with open(json_path, 'r') as fp:
+        with open(self._cache_path, 'r') as fp:
             headers = json.load(fp)
+            self.header_fields = {}
             for field_name, field in headers.items():
                 self.header_fields[field_name] = Field(**field)

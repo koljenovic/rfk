@@ -1,0 +1,4 @@
+0.3.0
+- whole new Harbour dbfadapter
+- old style lambda filters deprecated in favor of new style json filters
+- dbf dependency removed

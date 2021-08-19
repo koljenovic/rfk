@@ -17,31 +17,79 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)) + '/../src')
 
 import rfkadapter
-import mdbf as dbf
 import json
 import secrets
 import unittest
-import datetime
-from rfkadapter import RFKAdapter, Field, Type, FieldError
+from datetime import datetime, date
+from rfkadapter import DBFAdapter, RFKAdapter, Field, Type, FieldError, _EXE
 from unittest import TestCase
+
+class DBFAdapterTest(TestCase):
+    def __init__(self, *args, **kwds):
+        self._db_path = os.path.dirname(os.path.realpath(__file__)) + '/data/'
+        super(DBFAdapterTest, self).__init__(*args, **kwds)
+
+    def _set_up(self, table_name='ULIZ.DBF'): 
+        self._adapter = DBFAdapter(self._db_path, table_name)
+
+    def test_head_read(self):
+        headers = json.loads(DBFAdapter._head(self._db_path, 'ULIZ.DBF'))
+        self.assertEqual(headers[-1], "<MTR_ULI, C, 7, 0>")
+
+    def test_parse_meta(self):
+        self._set_up()
+        self._adapter._parse_meta()
+        self.assertEqual('MTR_ULI' in self._adapter._meta, True)
+        # MEMO should be in _meta
+        self.assertEqual('NAP_ULI' in self._adapter._meta, True)
+
+    def test_export(self):
+        outcome = DBFAdapter._export(self._db_path, 'ULIZ.DBF', ['ULIZ01', 'ULIZ02', 'ULIZ03'])
+        self.assertEqual(len(outcome) > 500, True)
+
+    def test_indices_get_found(self):
+        """tests whether index files get found correctly"""
+        self._set_up()
+        self.assertEqual('ULIZ01' in self._adapter.index_files, True)
+        self.assertEqual('ULIZ02' in self._adapter.index_files, True)
+        self.assertEqual('ULIZ03' in self._adapter.index_files, True)
+
+    def test_parse_memo(self):
+        self._set_up()
+        target = {'OBJ_ULI': ('OBJ_ULI', 67, 3, 0), 'DOK_ULI': ('DOK_ULI', 67, 2, 0), 'SIF_ULI': ('SIF_ULI', 67, 5, 0), 'GOT_ULI': ('GOT_ULI', 67, 1, 0), 'NAL_ULI': ('NAL_ULI', 67, 3, 0), 'DAT_ULI': ('DAT_ULI', 68, 8, 0), 'OTP_ULI': ('OTP_ULI', 67, 20, 0), 'NAO_ULI': ('NAO_ULI', 67, 50, 0), 'DAI_ULI': ('DAI_ULI', 68, 8, 0), 'MIS_ULI': ('MIS_ULI', 67, 50, 0), 'VAL_ULI': ('VAL_ULI', 68, 8, 0), 'DAN_ULI': ('DAN_ULI', 78, 3, 0), 'RBR_ULI': ('RBR_ULI', 78, 4, 0), 'KUF_ULI': ('KUF_ULI', 67, 10, 0), 'ZAD_ULI': ('ZAD_ULI', 67, 3, 0), 'PAR_ULI': ('PAR_ULI', 67, 7, 0), 'PRO_ULI': ('PRO_ULI', 67, 3, 0), 'TRG_ULI': ('TRG_ULI', 67, 3, 0), 'KAS_ULI': ('KAS_ULI', 78, 5, 2), 'PUT_ULI': ('PUT_ULI', 67, 3, 0), 'NAP_ULI': ('NAP_ULI', 77, 10, 0), 'LIK_ULI': ('LIK_ULI', 76, 1, 0), 'FIN_ULI': ('FIN_ULI', 76, 1, 0), 'L0_ULI': ('L0_ULI', 76, 1, 0), 'L1_ULI': ('L1_ULI', 76, 1, 0), 'L2_ULI': ('L2_ULI', 76, 1, 0), 'L3_ULI': ('L3_ULI', 76, 1, 0), 'L4_ULI': ('L4_ULI', 76, 1, 0), 'L5_ULI': ('L5_ULI', 76, 1, 0), 'L6_ULI': ('L6_ULI', 76, 1, 0), 'L7_ULI': ('L7_ULI', 76, 1, 0), 'L8_ULI': ('L8_ULI', 76, 1, 0), 'L9_ULI': ('L9_ULI', 76, 1, 0), 'L1A_ULI': ('L1A_ULI', 76, 1, 0), 'L2A_ULI': ('L2A_ULI', 76, 1, 0), 'L3A_ULI': ('L3A_ULI', 76, 1, 0), 'L4A_ULI': ('L4A_ULI', 76, 1, 0), 'L5A_ULI': ('L5A_ULI', 76, 1, 0), 'N1_ULI': ('N1_ULI', 78, 1, 0), 'N2_ULI': ('N2_ULI', 78, 1, 0), 'FIS_ULI': ('FIS_ULI', 76, 1, 0), 'REK_ULI': ('REK_ULI', 76, 1, 0), 'STO_ULI': ('STO_ULI', 76, 1, 0), 'FRA_ULI': ('FRA_ULI', 67, 6, 0), 'FRR_ULI': ('FRR_ULI', 67, 6, 0), 'MJE_ULI': ('MJE_ULI', 67, 2, 0), 'PAS_ULI': ('PAS_ULI', 67, 10, 0), 'DAS_ULI': ('DAS_ULI', 68, 8, 0), 'MTR_ULI': ('MTR_ULI', 67, 7, 0)}
+        self._adapter._parse_meta()
+        for k, v in target.items():
+            self.assertEqual(k in self._adapter._meta, True)
+            self.assertEqual(v, self._adapter._meta[k])
+
+    def test_field_info(self):
+        self._set_up()
+        self._adapter._parse_meta()
+        mock_meta = self._adapter.field_info('OTP_ULI')
+        self.assertEqual(mock_meta[0], Type.CHAR)
+        self.assertEqual(mock_meta[1], 20)
+        self.assertEqual(mock_meta[2], 0)
+
+    def test_update(self):
+        # @TODO: this case should probably be expanded
+        with open(self._db_path + '/dbfadapter/update.json') as f:
+            package = json.load(f)
+            outcome = DBFAdapter._update(package, self._db_path, 'ULIZ.DBF', ['ULIZ01', 'ULIZ02', 'ULIZ03'])
+            self.assertEqual(outcome, True)
+
 
 class RFKAdapterTest(TestCase):
     def __init__(self, *args, **kwds):
         self._db_path = os.path.dirname(os.path.realpath(__file__)) + '/data/'
         super(RFKAdapterTest, self).__init__(*args, **kwds)
 
-    def _set_up(self, table_name='ULIZ.DBF', mode='r'): 
-        self._adapter = RFKAdapter(self._db_path, table_name, mode)
+    def _set_up(self, table_name='ULIZ.DBF', with_headers=True): 
+        self._adapter = RFKAdapter(self._db_path, table_name, with_headers=with_headers)
 
-    def test_101_read_constructor(self):
+    def test_basic_constructor(self):
         """test opening the table for reading"""
         self._adapter = RFKAdapter(self._db_path, 'ULIZ.DBF')
-        self.assertEqual(self._adapter._table.status, dbf.READ_ONLY)
-
-    def test_102_write_constructor(self):
-        """test opening the table for writing"""
-        self._adapter = RFKAdapter(self._db_path, 'ULIZ.DBF', 'W')
-        self.assertEqual(self._adapter._table.status, dbf.READ_WRITE)
+        self.assertEqual(self._adapter._table != None, True)
 
     def test_prepare_read_value(self):
         """tests encoding and value conversion for values read from table"""
@@ -82,13 +130,13 @@ class RFKAdapterTest(TestCase):
         self._set_up()
         result = self._adapter._read([('OTP_ULI', lambda x: x == '880')], raw_result=True)
         self.assertNotEqual(result, [])
-        self.assertEqual(result[0]['OTP_ULI'], '880                 ')
+        self.assertEqual(result[0]['OTP_ULI'], '880')
         self.assertEqual(result[0]['OBJ_ULI'], '010')
         self.assertEqual(result[0]['DOK_ULI'], '20')
         self.assertEqual(result[0]['SIF_ULI'], '00881')
         self.assertEqual(result[0]['KUF_ULI'], '       880')
 
-    def test_multi_filtered_read(self):
+    def test_multi_filtered_internal_read(self):
         """test reading multiple record filtered by multiple conditions"""
         self._set_up()
         result = self._adapter._read([
@@ -100,23 +148,35 @@ class RFKAdapterTest(TestCase):
             self.assertEqual(record['OBJ_ULI'], '010')
             self.assertEqual(record['DOK_ULI'], '20')
 
+    def test_multi_filtered_read(self):
+        """test reading multiple record filtered by multiple conditions"""
+        self._set_up()
+        result = self._adapter.read([
+            ('OBJ_ULI', lambda x: x == 10),
+            ('DOK_ULI', lambda x: x == 20),
+            ])
+        self.assertGreater(len(result), 0)
+        for record in result:
+            self.assertEqual(record['OBJ_ULI'], 10)
+            self.assertEqual(record['DOK_ULI'], 20)
+
     def test_nonexistent_filter_key(self):
         """test raising a FieldError on nonexistent field filter key"""
         self._set_up()
         try:
-            self.assertRaises(FieldError, self._adapter._read, [('SOK_ULI', lambda x: True)])
+            self.assertRaises(FieldError, self._adapter._read, [('SOK_ULI', lambda x: 'T')])
         except:
             pass
 
     def test_return_all(self):
         """return all the records with empty filter list"""
         self._set_up()
-        self.assertGreater(len(self._adapter._read()), 0)
+        self.assertGreater(len(self._adapter._read()), 1000)
 
     def test_record_append(self):
         """test appending a single record to the table"""
         self._set_up('ULIZ.DBF')
-        sample_record = {'OBJ_ULI': '010', 'DOK_ULI': '20', 'SIF_ULI': '00000', 'GOT_ULI': None, 'NAL_ULI': 'ADM', 'DAT_ULI': dbf.DateTime(2021, 6, 14), 'OTP_ULI': '225883', 'NAO_ULI': None, 'DAI_ULI': dbf.DateTime(2021, 6, 14), 'MIS_ULI': None, 'VAL_ULI': dbf.DateTime(2021, 6, 14), 'DAN_ULI': 0, 'RBR_ULI': 2, 'KUF_ULI': '1234', 'ZAD_ULI': '001', 'PAR_ULI': '0196552', 'PRO_ULI': None, 'TRG_ULI': None, 'KAS_ULI': 0, 'PUT_ULI': '001', 'NAP_ULI': '', 'LIK_ULI': None, 'FIN_ULI': None, 'L0_ULI': False, 'L1_ULI': False, 'L2_ULI': False, 'L3_ULI': False, 'L4_ULI': False, 'L5_ULI': False, 'L6_ULI': False, 'L7_ULI': False, 'L8_ULI': False, 'L9_ULI': False, 'L1A_ULI': None, 'L2A_ULI': None, 'L3A_ULI': None, 'L4A_ULI': None, 'L5A_ULI': None, 'N1_ULI': 0, 'N2_ULI': 0, 'FIS_ULI': None, 'REK_ULI': None, 'STO_ULI': None, 'FRA_ULI': None, 'FRR_ULI': None, 'MJE_ULI': None, 'PAS_ULI': None, 'DAS_ULI': None, 'MTR_ULI': None}
+        sample_record = {'OBJ_ULI': '010', 'DOK_ULI': '20', 'SIF_ULI': '00000', 'GOT_ULI': None, 'NAL_ULI': 'ADM', 'DAT_ULI': datetime(2021, 6, 14), 'OTP_ULI': '225883', 'NAO_ULI': None, 'DAI_ULI': datetime(2021, 6, 14), 'MIS_ULI': None, 'VAL_ULI': datetime(2021, 6, 14), 'DAN_ULI': 0, 'RBR_ULI': 2, 'KUF_ULI': '1234', 'ZAD_ULI': '001', 'PAR_ULI': '0196552', 'PRO_ULI': None, 'TRG_ULI': None, 'KAS_ULI': 0, 'PUT_ULI': '001', 'NAP_ULI': '', 'LIK_ULI': None, 'FIN_ULI': None, 'L0_ULI': False, 'L1_ULI': False, 'L2_ULI': False, 'L3_ULI': False, 'L4_ULI': False, 'L5_ULI': False, 'L6_ULI': False, 'L7_ULI': False, 'L8_ULI': False, 'L9_ULI': False, 'L1A_ULI': None, 'L2A_ULI': None, 'L3A_ULI': None, 'L4A_ULI': None, 'L5A_ULI': None, 'N1_ULI': 0, 'N2_ULI': 0, 'FIS_ULI': None, 'REK_ULI': None, 'STO_ULI': None, 'FRA_ULI': None, 'FRR_ULI': None, 'MJE_ULI': None, 'PAS_ULI': None, 'DAS_ULI': None, 'MTR_ULI': None}
         result = self._adapter._read([
             ('OBJ_ULI', lambda x: x == '010'),
             ('DOK_ULI', lambda x: x == '20'),
@@ -127,8 +187,8 @@ class RFKAdapterTest(TestCase):
         self._adapter = None
         self._set_up('ULIZ.DBF')
         result = self._adapter.read([
-            ('OBJ_ULI', lambda x: x == '010'),
-            ('DOK_ULI', lambda x: x == '20'),
+            ('OBJ_ULI', lambda x: x == 10),
+            ('DOK_ULI', lambda x: x == 20),
             ])
         self.assertEqual(result[-1]['SIF_ULI'], int(fresh_row_id))
 
@@ -163,15 +223,25 @@ class RFKAdapterTest(TestCase):
 
     def test_header_parsed_uliz(self):
         """tests if the headers gets parsed and if it gets parsed right"""
-        self._set_up()
-        target = { 'OBJ_ULI': '<OBJ_ULI, C, 3, 0, True, 0, I>', 'DOK_ULI': '<DOK_ULI, C, 2, 0, False, None, I>', 'SIF_ULI': '<SIF_ULI, C, 5, 0, True, 0, I>', 'GOT_ULI': '<GOT_ULI, C, 1, 0, False, None, I>', 'NAL_ULI': '<NAL_ULI, C, 3, 0, False, None, C>', 'DAT_ULI': '<DAT_ULI, D, 8, 0, None, None, D>', 'OTP_ULI': '<OTP_ULI, C, 20, 0, R,  , C>', 'NAO_ULI': '<NAO_ULI, C, 50, 0, None, None, X>', 'DAI_ULI': '<DAI_ULI, D, 8, 0, None, None, D>', 'MIS_ULI': '<MIS_ULI, C, 50, 0, None, None, X>', 'VAL_ULI': '<VAL_ULI, D, 8, 0, None, None, D>', 'DAN_ULI': '<DAN_ULI, N, 3, 0, None, None, N>', 'RBR_ULI': '<RBR_ULI, N, 4, 0, None, None, N>', 'KUF_ULI': '<KUF_ULI, C, 10, 0, L,  , C>', 'ZAD_ULI': '<ZAD_ULI, C, 3, 0, True, 0, I>', 'PAR_ULI': '<PAR_ULI, C, 7, 0, True, 0, I>', 'PRO_ULI': '<PRO_ULI, C, 3, 0, False, None, I>', 'TRG_ULI': '<TRG_ULI, C, 3, 0, True, 0, I>', 'KAS_ULI': '<KAS_ULI, N, 5, 2, None, None, F>', 'PUT_ULI': '<PUT_ULI, C, 3, 0, True, 0, I>', 'NAP_ULI': '<NAP_ULI, M, 10, 0, None, None, M>', 'LIK_ULI': '<LIK_ULI, L, 1, 0, None, None, L>', 'FIN_ULI': '<FIN_ULI, L, 1, 0, None, None, L>', 'L0_ULI': '<L0_ULI, L, 1, 0, None, None, L>', 'L1_ULI': '<L1_ULI, L, 1, 0, None, None, L>', 'L2_ULI': '<L2_ULI, L, 1, 0, None, None, L>', 'L3_ULI': '<L3_ULI, L, 1, 0, None, None, L>', 'L4_ULI': '<L4_ULI, L, 1, 0, None, None, L>', 'L5_ULI': '<L5_ULI, L, 1, 0, None, None, L>', 'L6_ULI': '<L6_ULI, L, 1, 0, None, None, L>', 'L7_ULI': '<L7_ULI, L, 1, 0, None, None, L>', 'L8_ULI': '<L8_ULI, L, 1, 0, None, None, L>', 'L9_ULI': '<L9_ULI, L, 1, 0, None, None, L>', 'L1A_ULI': '<L1A_ULI, L, 1, 0, None, None, L>', 'L2A_ULI': '<L2A_ULI, L, 1, 0, None, None, L>', 'L3A_ULI': '<L3A_ULI, L, 1, 0, None, None, L>', 'L4A_ULI': '<L4A_ULI, L, 1, 0, None, None, L>', 'L5A_ULI': '<L5A_ULI, L, 1, 0, None, None, L>', 'N1_ULI': '<N1_ULI, N, 1, 0, None, None, N>', 'N2_ULI': '<N2_ULI, N, 1, 0, None, None, N>', 'FIS_ULI': '<FIS_ULI, L, 1, 0, None, None, L>', 'REK_ULI': '<REK_ULI, L, 1, 0, None, None, L>', 'STO_ULI': '<STO_ULI, L, 1, 0, None, None, L>', 'FRA_ULI': '<FRA_ULI, C, 6, 0, True, 0, I>', 'FRR_ULI': '<FRR_ULI, C, 6, 0, True, 0, I>', 'MJE_ULI': '<MJE_ULI, C, 2, 0, None, None, X>', 'PAS_ULI': '<PAS_ULI, C, 10, 0, None, None, X>', 'DAS_ULI': '<DAS_ULI, D, 8, 0, None, None, D>', 'MTR_ULI': '<MTR_ULI, C, 7, 0, None, None, X>' }
+        self._set_up(with_headers=False)
+        self._adapter._parse_headers(flush=True)
+        target = { 'OBJ_ULI': '<OBJ_ULI, C, 3, 0, True, 0, I>', 'DOK_ULI': '<DOK_ULI, C, 2, 0, False, None, I>', 'SIF_ULI': '<SIF_ULI, C, 5, 0, True, 0, I>', 'GOT_ULI': '<GOT_ULI, C, 1, 0, False, None, I>', 'NAL_ULI': '<NAL_ULI, C, 3, 0, False, None, C>', 'DAT_ULI': '<DAT_ULI, D, 8, 0, None, None, D>', 'OTP_ULI': '<OTP_ULI, C, 20, 0, False, None, C>', 'NAO_ULI': '<NAO_ULI, C, 50, 0, None, None, X>', 'DAI_ULI': '<DAI_ULI, D, 8, 0, None, None, D>', 'MIS_ULI': '<MIS_ULI, C, 50, 0, None, None, X>', 'VAL_ULI': '<VAL_ULI, D, 8, 0, None, None, D>', 'DAN_ULI': '<DAN_ULI, N, 3, 0, None, None, N>', 'RBR_ULI': '<RBR_ULI, N, 4, 0, None, None, N>', 'KUF_ULI': '<KUF_ULI, C, 10, 0, L,  , C>', 'ZAD_ULI': '<ZAD_ULI, C, 3, 0, True, 0, I>', 'PAR_ULI': '<PAR_ULI, C, 7, 0, True, 0, I>', 'PRO_ULI': '<PRO_ULI, C, 3, 0, False, None, I>', 'TRG_ULI': '<TRG_ULI, C, 3, 0, True, 0, I>', 'KAS_ULI': '<KAS_ULI, N, 5, 2, None, None, F>', 'PUT_ULI': '<PUT_ULI, C, 3, 0, True, 0, I>', 'LIK_ULI': '<LIK_ULI, L, 1, 0, None, None, L>', 'FIN_ULI': '<FIN_ULI, L, 1, 0, None, None, L>', 'L0_ULI': '<L0_ULI, L, 1, 0, None, None, L>', 'L1_ULI': '<L1_ULI, L, 1, 0, None, None, L>', 'L2_ULI': '<L2_ULI, L, 1, 0, None, None, L>', 'L3_ULI': '<L3_ULI, L, 1, 0, None, None, L>', 'L4_ULI': '<L4_ULI, L, 1, 0, None, None, L>', 'L5_ULI': '<L5_ULI, L, 1, 0, None, None, L>', 'L6_ULI': '<L6_ULI, L, 1, 0, None, None, L>', 'L7_ULI': '<L7_ULI, L, 1, 0, None, None, L>', 'L8_ULI': '<L8_ULI, L, 1, 0, None, None, L>', 'L9_ULI': '<L9_ULI, L, 1, 0, None, None, L>', 'L1A_ULI': '<L1A_ULI, L, 1, 0, None, None, L>', 'L2A_ULI': '<L2A_ULI, L, 1, 0, None, None, L>', 'L3A_ULI': '<L3A_ULI, L, 1, 0, None, None, L>', 'L4A_ULI': '<L4A_ULI, L, 1, 0, None, None, L>', 'L5A_ULI': '<L5A_ULI, L, 1, 0, None, None, L>', 'N1_ULI': '<N1_ULI, N, 1, 0, None, None, N>', 'N2_ULI': '<N2_ULI, N, 1, 0, None, None, N>', 'FIS_ULI': '<FIS_ULI, L, 1, 0, None, None, L>', 'REK_ULI': '<REK_ULI, L, 1, 0, None, None, L>', 'STO_ULI': '<STO_ULI, L, 1, 0, None, None, L>', 'FRA_ULI': '<FRA_ULI, C, 6, 0, True, 0, I>', 'FRR_ULI': '<FRR_ULI, C, 6, 0, True, 0, I>', 'MJE_ULI': '<MJE_ULI, C, 2, 0, None, None, X>', 'PAS_ULI': '<PAS_ULI, C, 10, 0, None, None, X>', 'DAS_ULI': '<DAS_ULI, D, 8, 0, None, None, D>', 'MTR_ULI': '<MTR_ULI, C, 7, 0, None, None, X>' }
         self.assertEqual(len(self._adapter.header_fields), len(target))
         for k, v in self._adapter.header_fields.items():
             self.assertEqual(str(v), target[k])
+        self.assertEqual(os.path.isfile(self._adapter._cache_path), True)
+
+    def test_flush_headers(self):
+        self._set_up()
+        self.assertEqual(os.path.isfile(self._adapter._cache_path), True)
+        self._adapter._flush_headers()
+        self.assertEqual(self._adapter.header_fields, None)
+        self.assertEqual(os.path.isfile(self._adapter._cache_path), False)
 
     def test_header_parsed_adob(self):
         """tests if the headers gets parsed and if it gets parsed right"""
-        self._set_up('ADOB.DBF')
+        self._set_up('ADOB.DBF', with_headers=False)
+        self._adapter._parse_headers(flush=True)
         target = { 'DOK_ADO': '<DOK_ADO, C, 2, 0, None, None, X>', 'PAR_ADO': '<PAR_ADO, C, 7, 0, None, None, X>', 'DAT_ADO': '<DAT_ADO, D, 8, 0, None, None, D>', 'OBJ_ADO': '<OBJ_ADO, C, 3, 0, None, None, X>', 'ULI_ADO': '<ULI_ADO, C, 4, 0, None, None, X>', 'VAL_ADO': '<VAL_ADO, D, 8, 0, None, None, D>', 'OPI_ADO': '<OPI_ADO, C, 30, 0, None, None, X>', 'IZN_ADO': '<IZN_ADO, N, 15, 2, None, None, F>', 'DUP_ADO': '<DUP_ADO, C, 1, 0, None, None, X>' }
         for k, v in self._adapter.header_fields.items():
             self.assertEqual(str(v), target[k])
@@ -268,20 +338,17 @@ class RFKAdapterTest(TestCase):
         """test appending a mismatched types record to the table"""
         self._set_up('ULIZ.DBF')
         # @TODO: testirati dodavanje afrikata i coded karaktera
-        sample_record = {'OBJ_ULI': 10, 'DOK_ULI': 20, 'SIF_ULI': 0, 'GOT_ULI': None, 'NAL_ULI': 'ADM', 'DAT_ULI': '2021-07-07', 'OTP_ULI': '225883', 'NAO_ULI': None, 'DAI_ULI': '2021-06-14', 'MIS_ULI': None, 'VAL_ULI': dbf.DateTime(2021, 6, 14), 'DAN_ULI': 0, 'RBR_ULI': 2, 'KUF_ULI': '1234', 'ZAD_ULI': '001', 'PAR_ULI': '0196552', 'PRO_ULI': None, 'TRG_ULI': None, 'KAS_ULI': 0, 'PUT_ULI': '001', 'NAP_ULI': '', 'LIK_ULI': None, 'FIN_ULI': None, 'L0_ULI': False, 'L1_ULI': False, 'L2_ULI': False, 'L3_ULI': False, 'L4_ULI': False, 'L5_ULI': False, 'L6_ULI': False, 'L7_ULI': False, 'L8_ULI': False, 'L9_ULI': False, 'L1A_ULI': None, 'L2A_ULI': None, 'L3A_ULI': None, 'L4A_ULI': None, 'L5A_ULI': None, 'N1_ULI': 0, 'N2_ULI': 0, 'FIS_ULI': None, 'REK_ULI': None, 'STO_ULI': None, 'FRA_ULI': None, 'FRR_ULI': None, 'MJE_ULI': None, 'PAS_ULI': None, 'DAS_ULI': None, 'MTR_ULI': None}
+        sample_record = {'OBJ_ULI': 10, 'DOK_ULI': 20, 'SIF_ULI': 0, 'GOT_ULI': None, 'NAL_ULI': 'ADM', 'DAT_ULI': '2021-07-07', 'OTP_ULI': '225883', 'NAO_ULI': None, 'DAI_ULI': '2021-06-14', 'MIS_ULI': None, 'VAL_ULI': datetime(2021, 6, 14), 'DAN_ULI': 0, 'RBR_ULI': 2, 'KUF_ULI': '1234', 'ZAD_ULI': '001', 'PAR_ULI': '0196552', 'PRO_ULI': None, 'TRG_ULI': None, 'KAS_ULI': 0, 'PUT_ULI': '001', 'NAP_ULI': '', 'LIK_ULI': None, 'FIN_ULI': None, 'L0_ULI': False, 'L1_ULI': False, 'L2_ULI': False, 'L3_ULI': False, 'L4_ULI': False, 'L5_ULI': False, 'L6_ULI': False, 'L7_ULI': False, 'L8_ULI': False, 'L9_ULI': False, 'L1A_ULI': None, 'L2A_ULI': None, 'L3A_ULI': None, 'L4A_ULI': None, 'L5A_ULI': None, 'N1_ULI': 0, 'N2_ULI': 0, 'FIS_ULI': None, 'REK_ULI': None, 'STO_ULI': None, 'FRA_ULI': None, 'FRR_ULI': None, 'MJE_ULI': None, 'PAS_ULI': None, 'DAS_ULI': None, 'MTR_ULI': None}
         result = self._adapter._read([
             ('OBJ_ULI', lambda x: x == '010'),
             ('DOK_ULI', lambda x: x == '20'),
             ])
         fresh_row_id = str(max([int(record['SIF_ULI']) for record in result]) + 1).zfill(5)
         sample_record['SIF_ULI'] = int(fresh_row_id)
-        # @HERE@TODO: fix the API
         self._adapter.write(sample_record)
-        self._adapter = None
-        self._set_up('ULIZ.DBF')
         result = self._adapter.read([
-            ('OBJ_ULI', lambda x: x == '010'),
-            ('DOK_ULI', lambda x: x == '20'),
+            ('OBJ_ULI', lambda x: x == 10),
+            ('DOK_ULI', lambda x: x == 20),
             ])
         self.assertEqual(result[-1]['SIF_ULI'], int(fresh_row_id))
         # NOTE: Ensures indexes get updated as well
@@ -293,13 +360,13 @@ class RFKAdapterTest(TestCase):
     def test_updating_single_record(self):
         """tests updating a single existing record"""
         self._set_up('ULIZ.DBF', 'W')
-        today = datetime.date.today().isoformat()
+        today = Field.dtoiso(date.today())
         randval = str(secrets.randbelow(10**6))
         success = self._adapter.update(
             { 'DAT_ULI': today, 'KUF_ULI': randval},
-            [('OBJ_ULI', lambda x: x == 10),
-            ('DOK_ULI', lambda x: x == 20),
-            ('SIF_ULI', 'eq', '915'),
+            [('OBJ_ULI', 'eq', 10),
+            ('DOK_ULI', 'eq', 20),
+            ('SIF_ULI', 'eq', 915),
             ])
         self.assertEqual(success, True)
         outcome = self._adapter.filter([
@@ -311,15 +378,24 @@ class RFKAdapterTest(TestCase):
         self.assertEqual(outcome[-1]['DAT_ULI'], today)
         self.assertEqual(outcome[-1]['KUF_ULI'], randval)
 
+    def test_dtoiso(self):
+        self.assertEqual(Field.dtoiso('20020812'), '2002-08-12')
+        self.assertEqual(Field.dtoiso(date(2002, 8, 12)), '2002-08-12')
+
+    def test_isotod(self):
+        self.assertEqual(Field.isotod('2002-08-12'), '20020812')
+        self.assertEqual(Field.isotod(date(2002, 8, 12)), '20020812')
+
     def test_updating_multiple_records(self):
         """tests updating multiple records by a certain criteria"""
-        self._set_up('ULIZ.DBF', 'W')
+        self._set_up('ULIZ.DBF')
         randval = str(secrets.randbelow(10**6))
         success = self._adapter.update(
             { 'KUF_ULI': randval},
-            [('OBJ_ULI', lambda x: x == 10),
-            ('DOK_ULI', lambda x: x == 20),
-            ('SIF_ULI', lambda x: x >= 800 and x < 810),
+            [('OBJ_ULI', 'eq', '010'),
+            ('DOK_ULI', 'eq', '20'),
+            ('SIF_ULI', 'gte', '800'),
+            ('SIF_ULI', 'lt', '810'),
             ])
         self.assertEqual(success, True)
         outcome = self._adapter.filter([
@@ -331,11 +407,12 @@ class RFKAdapterTest(TestCase):
         for record in outcome:
             self.assertEqual(record['KUF_ULI'], randval)
         # CASE: no object exists for filter
-        success = self._adapter.update(
-            { 'KUF_ULI': 12345},
-            [('OBJ_ULI', lambda x: x == 32123),
-            ])
-        self.assertEqual(success, False)
+        # @TODO: reimplement number of updated records
+        # success = self._adapter.update(
+        #     { 'KUF_ULI': 12345},
+        #     [('OBJ_ULI', 'eq', '32123'),
+        #     ])
+        # self.assertEqual(success, False)
 
     def test_is_char_column_string(self):
         """tests determining whether a char column is a string column"""
@@ -363,7 +440,7 @@ class RFKAdapterTest(TestCase):
     def test_read_all(self):
         """tests if all the values get read"""
         self._set_up()
-        self.assertGreater(len(self._adapter.read_all()), 500)
+        self.assertGreater(len(self._adapter.read_all()), 1000)
 
     def test_filter(self):
         """tests filtering the read values"""
@@ -401,8 +478,18 @@ class RFKAdapterTest(TestCase):
         outcome = mock_field.ftoc('')
         self.assertEqual(outcome, None)
         mock_field = self._adapter.header_fields['DAT_ULI']
-        outcome = mock_field.ftoc(datetime.date.fromisoformat('2021-07-09'))
+        outcome = mock_field.ftoc('20210709')
         self.assertEqual(outcome, '2021-07-09')
+        mock_field = self._adapter.header_fields['L9_ULI']
+        outcome = mock_field.ftoc('F')
+        self.assertEqual(outcome, False)
+        outcome = mock_field.ftoc('T')
+        self.assertEqual(outcome, True)
+        mock_field = self._adapter.header_fields['FIN_ULI']
+        outcome = mock_field.ftoc(True)
+        self.assertEqual(outcome, True)
+        outcome = mock_field.ftoc(False)
+        self.assertEqual(outcome, False)
 
     def test_is_char_string_padded(self):
         """test whether padding is determined correctly"""
@@ -423,7 +510,7 @@ class RFKAdapterTest(TestCase):
         """tests whether the whole column is padded char strings"""
         self._set_up()
         mock_field = Field('OTP_ULI', *self._adapter._table.field_info('OTP_ULI')[:3])
-        self.assertEqual(self._adapter._is_char_column_padded_string(mock_field), (True, 'R'))
+        self.assertEqual(self._adapter._is_char_column_padded_string(mock_field), (False, None))
         mock_field = Field('KUF_ULI', *self._adapter._table.field_info('KUF_ULI')[:3])
         self.assertEqual(self._adapter._is_char_column_padded_string(mock_field), (True, 'L'))
         mock_field = self._adapter.header_fields['NAO_ULI']
@@ -448,15 +535,34 @@ class RFKAdapterTest(TestCase):
         mock_field = self._adapter.header_fields['SIF_ULI']
         outcome = mock_field.ctof(123)
         self.assertEqual(outcome, '00123')
+        mock_field = self._adapter.header_fields['SIF_ULI']
+        outcome = mock_field.ctof('123')
+        self.assertEqual(outcome, '00123')
         mock_field = self._adapter.header_fields['DAT_ULI']
         outcome = mock_field.ctof('2021-07-09')
-        self.assertEqual(outcome, datetime.date.fromisoformat('2021-07-09'))
+        self.assertEqual(outcome, '2021-07-09')
+        outcome = mock_field.ctof('2021-07-09')
+        self.assertEqual(outcome, '2021-07-09')
         mock_field = self._adapter.header_fields['MIS_ULI']
         outcome = mock_field.ctof(None)
         self.assertEqual(outcome, None)
         mock_field = self._adapter.header_fields['KUF_ULI']
         outcome = mock_field.ctof('1234')
         self.assertEqual(outcome, '      1234')
+        mock_field = self._adapter.header_fields['RBR_ULI']
+        outcome = mock_field.ctof('1234')
+        self.assertEqual(outcome, 1234)
+        mock_field = self._adapter.header_fields['FIN_ULI']
+        outcome = mock_field.ctof('T')
+        self.assertEqual(outcome, True)
+        mock_field = self._adapter.header_fields['FIN_ULI']
+        outcome = mock_field.ctof('F')
+        self.assertEqual(outcome, False)
+        mock_field = self._adapter.header_fields['FIN_ULI']
+        outcome = mock_field.ctof(True)
+        self.assertEqual(outcome, True)
+        outcome = mock_field.ctof(False)
+        self.assertEqual(outcome, False)
 
     def test_convert_condition(self):
         """tests if convenience style where conditions get translated correctly"""
@@ -551,13 +657,12 @@ class RFKAdapterTest(TestCase):
 
     def test_json_caching_and_restoring_parsed_headers(self):
         """tests whether header Field objects get cached and restored correctly"""
-        self._set_up()
-        base_name = os.path.splitext(self._adapter.table_name)[0]
-        json_path = os.path.join(self._adapter.db_path, base_name + '.json')
-        self._adapter._cache_headers()
-        self.assertEqual(os.path.isfile(json_path), True)
+        self._set_up(with_headers=False)
+        self._adapter._parse_headers(flush=True)
+        self.assertEqual(os.path.isfile(self._adapter._cache_path), True)
+        self._adapter.header_fields = None
         self._adapter._restore_headers()
-        with open(json_path, 'r') as fp:
+        with open(self._adapter._cache_path, 'r') as fp:
             headers = json.load(fp)
             for field_name, field_value in headers.items():
                 self.assertEqual(str(Field(**field_value)), str(self._adapter.header_fields[field_name]))
@@ -597,13 +702,6 @@ class RFKAdapterTest(TestCase):
         mock_field = self._adapter.header_fields['MIS_ULI']
         outcome = mock_field.ctox(None)
         self.assertEqual(outcome, '""')
-
-    def test_indices_get_found(self):
-        """tests whether index files get found correctly"""
-        self._set_up()
-        self.assertEqual('ULIZ01' in self._adapter.index_files, True)
-        self.assertEqual('ULIZ02' in self._adapter.index_files, True)
-        self.assertEqual('ULIZ03' in self._adapter.index_files, True)
 
 if __name__ == '__main__':
     unittest.main(failfast=True)
