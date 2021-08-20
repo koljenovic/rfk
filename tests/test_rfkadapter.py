@@ -71,12 +71,11 @@ class DBFAdapterTest(TestCase):
         self.assertEqual(mock_meta[2], 0)
 
     def test_update(self):
-        # @TODO: this case should probably be expanded
+        """ basic _update smoke test to establish that input gets parsed OK """
         with open(self._db_path + '/dbfadapter/update.json') as f:
             package = json.load(f)
             outcome = DBFAdapter._update(package, self._db_path, 'ULIZ.DBF', ['ULIZ01', 'ULIZ02', 'ULIZ03'])
-            self.assertEqual(outcome, True)
-
+            self.assertEqual(outcome > 0, True)
 
 class RFKAdapterTest(TestCase):
     def __init__(self, *args, **kwds):
@@ -397,7 +396,8 @@ class RFKAdapterTest(TestCase):
             ('SIF_ULI', 'gte', '800'),
             ('SIF_ULI', 'lt', '810'),
             ])
-        self.assertEqual(success, True)
+        self.assertNotEqual(success, None)
+        self.assertEqual(success > 0, True)
         outcome = self._adapter.filter([
             ('OBJ_ULI', lambda x: x == 10),
             ('DOK_ULI', lambda x: x == 20),
@@ -407,12 +407,11 @@ class RFKAdapterTest(TestCase):
         for record in outcome:
             self.assertEqual(record['KUF_ULI'], randval)
         # CASE: no object exists for filter
-        # @TODO: reimplement number of updated records
-        # success = self._adapter.update(
-        #     { 'KUF_ULI': 12345},
-        #     [('OBJ_ULI', 'eq', '32123'),
-        #     ])
-        # self.assertEqual(success, False)
+        success = self._adapter.update(
+            { 'KUF_ULI': 12345},
+            [('OBJ_ULI', 'eq', '32123'),
+            ])
+        self.assertEqual(success, 0)
 
     def test_is_char_column_string(self):
         """tests determining whether a char column is a string column"""

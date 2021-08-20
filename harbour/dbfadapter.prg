@@ -3,6 +3,7 @@
 FUNCTION MAIN(command)
     LOCAL i, args := {}
     
+    ErrorLevel(0)
     SET DELETED ON
     SET DATE FORMAT "yyyy-mm-dd"
 
@@ -35,7 +36,9 @@ FUNCTION HEAD(argv)
 
     USE (base)
     IF !FLock()
+        ErrorLevel(50)
         OutStd("500 ERROR. LOCKED")
+        ErrorLevel()
     ENDIF
 
     Set(_SET_FILECASE, 0)
@@ -49,8 +52,9 @@ FUNCTION HEAD(argv)
 FUNCTION EXPORT(argv)
     LOCAL i, path, base, tmpfile
     IF Len(argv) < 3
+        ErrorLevel(40)
         OutStd("400 ERROR. USAGE e.g: filter ABS_DBPATH NAME.DBF ABSTMPFILEPATH [INDEX01.NTX ...]")
-        RETURN 1
+        RETURN ErrorLevel()
     ENDIF
     path := argv[1]
     base := argv[2]
@@ -60,12 +64,16 @@ FUNCTION EXPORT(argv)
     
     USE (base)
     IF !FLock()
+        ErrorLevel(50)
         OutStd("500 ERROR. LOCKED")
+        RETURN ErrorLevel()
     ENDIF
     FOR i := 4 TO Len(argv)
         SET INDEX TO (argv[i]) ADDITIVE
         IF !FLock()
+            ErrorLevel(50)
             OutStd("500 ERROR. LOCKED")
+            RETURN ErrorLevel()
         ENDIF
     NEXT
     Set(_SET_FILECASE, 0)
@@ -76,8 +84,9 @@ FUNCTION APPEND(argv)
     LOCAL i, path, base, csvfile
     Set(_SET_FILECASE, 2)
     IF Len(argv) < 3
+        ErrorLevel(40)
         OutStd("400 ERROR. USAGE e.g: append ABS_DBPATH NAME.DBF ABSCSVFILEPATH [INDEX01.NTX ...]")
-        RETURN 1
+        RETURN ErrorLevel()
     ENDIF
     path := argv[1]
     base := argv[2]
@@ -86,12 +95,16 @@ FUNCTION APPEND(argv)
     Set(_SET_DEFAULT, hb_DirSepToOS(path))
     USE (base)
     IF !FLock()
+        ErrorLevel(50)
         OutStd("500 ERROR. LOCKED")
+        RETURN ErrorLevel()
     ENDIF
     FOR i := 4 TO Len(argv)
         SET INDEX TO (argv[i]) ADDITIVE
         IF !FLock()
+            ErrorLevel(50)
             OutStd("500 ERROR. LOCKED")
+            RETURN ErrorLevel()
         ENDIF
     NEXT
     Set(_SET_FILECASE, 0)
@@ -100,9 +113,10 @@ FUNCTION APPEND(argv)
     OutStd("200 SUCCESS")
 
 FUNCTION UPDATE(argv)
-    LOCAL i, path, base, jsonFile, request := {}, keys, key, e, filterString := "", insets := {}, finVal, s, f
+    LOCAL i, path, base, jsonFile, request := {}, keys, key, e, filterString := "", insets := {}, finVal, s, f, eType, updatedCount := 0
     Set(_SET_FILECASE, 2)
     IF Len(argv) < 3
+        ErrorLevel(1)
         OutStd("400 ERROR. USAGE e.g: update ABS_DBPATH NAME.DBF ABSJSONFILEPATH [INDEX01.NTX ...]")
         RETURN 1
     ENDIF
@@ -113,12 +127,16 @@ FUNCTION UPDATE(argv)
     Set(_SET_DEFAULT, hb_DirSepToOS(path))
     USE (base)
     IF !FLock()
+        ErrorLevel(50)
         OutStd("500 ERROR. LOCKED")
+        RETURN ErrorLevel()
     ENDIF
     FOR i := 4 TO Len(argv)
         SET INDEX TO (argv[i]) ADDITIVE
         IF !FLock()
+            ErrorLevel(50)
             OutStd("500 ERROR. LOCKED")
+            RETURN ErrorLevel()
         ENDIF
     NEXT
     Set(_SET_FILECASE, 0)
@@ -128,25 +146,48 @@ FUNCTION UPDATE(argv)
     // @TODO: test in python
     FOR i := 1 TO Len(request['where'])
         e := request['where'][i]
+        eType := ValType(&(base)->&(e['column_name']))
+        DO CASE
+            CASE eType == 'D'
+                e['value'] := "CToD('" + e['value'] + "')"
+            CASE eType == 'C'
+                e['value'] := "'" + e['value'] + "'"
+            CASE eType == 'I'
+                e['value'] := Str(e['value'])
+            CASE eType == 'N'
+                e['value'] := Str(e['value'])
+            CASE eType == 'L' .AND. e['value']
+                e['value'] := '.T.'
+            CASE eType == 'L' .AND. .NOT. (e['value'])
+                e['value'] := '.F.'
+            OTHERWISE
+                ErrorLevel(44)
+                OutStd("404 ERROR. INVALID FILTER PARAMETERS VALUE")
+                RETURN ErrorLevel()
+        ENDCASE
         DO CASE
             CASE e['comparator'] == "lt"
-                filterString := filterString + e['column_name'] + " < '" + e['value'] + "'"
+                filterString := filterString + e['column_name'] + " < " + e['value']
             CASE e['comparator'] == "gt"
-                filterString := filterString + e['column_name'] + " > '" + e['value'] + "'"
+                filterString := filterString + e['column_name'] + " > " + e['value']
             CASE e['comparator'] == "lte"
-                filterString := filterString + e['column_name'] + " <= '" + e['value'] + "'"
+                filterString := filterString + e['column_name'] + " <= " + e['value']
             CASE e['comparator'] == "gte"
-                filterString := filterString + e['column_name'] + " >= '" + e['value'] + "'"
+                filterString := filterString + e['column_name'] + " >= " + e['value']
             CASE e['comparator'] == "eq"
-                filterString := filterString + e['column_name'] + " = '" + e['value'] + "'"
+                filterString := filterString + e['column_name'] + " = " + e['value']
             CASE e['comparator'] == "neq"
-                filterString := filterString + e['column_name'] + " <> '" + e['value'] + "'"
-            CASE e['comparator'] == "si"
-                filterString := filterString + "At('" + Lower(e['value']) + "', Lower(" + e['column_name'] + ")) > 0"
-            CASE e['comparator'] == "s"
-                filterString := filterString + "At('" + e['value'] + "', " + e['column_name'] + ") > 0"
-            CASE e['comparator'] == "x"
-                filterString := filterString + "hb_RegexHas('" + e['value'] + "', " + e['column_name'] + ")"
+                filterString := filterString + e['column_name'] + " <> " + e['value']
+            CASE e['comparator'] == "si" .AND. eType == 'C'
+                filterString := filterString + "At(Lower(" + e['value'] + "), Lower(" + e['column_name'] + ")) > 0"
+            CASE e['comparator'] == "s" .AND. eType == 'C'
+                filterString := filterString + "At(" + e['value'] + ", " + e['column_name'] + ") > 0"
+            CASE e['comparator'] == "x" .AND. eType == 'C'
+                filterString := filterString + "hb_RegexHas(" + e['value'] + ", " + e['column_name'] + ")"
+            OTHERWISE
+                ErrorLevel(44)
+                OutStd("404 ERROR. INVALID FILTER PARAMETERS COMPARATOR OR VALUE PAIR")
+                RETURN ErrorLevel()
         ENDCASE
         IF i < Len(request['where'])
             filterString := filterString + ' .AND. '
@@ -158,6 +199,7 @@ FUNCTION UPDATE(argv)
     SET FILTER TO &(filterString)
     GOTO TOP
     DO WHILE !Eof()
+        updatedCount := updatedCount + 1
         FOR EACH key IN keys
             insets := {}
             i := 1
@@ -173,7 +215,12 @@ FUNCTION UPDATE(argv)
             finVal := request['what'][key]
             FOR EACH e IN insets
                 IF Len(hb_Regex('__{\w+?}__', e)) > 0
-                    finVal := AtRepl(e, finVal, &(base)->&(SubStr(e, 4, Len(e) - 6)))
+                    s := &(base)->&(SubStr(e, 4, Len(e) - 6))
+                    IF ValType(s) == 'D'
+                        finVal := AtRepl(e, finVal, DToC(s))
+                    ELSE
+                        finVal := AtRepl(e, finVal, s)
+                    ENDIF
                 ENDIF
             NEXT
             IF ValType(&(base)->&(key)) == 'D'
@@ -184,6 +231,7 @@ FUNCTION UPDATE(argv)
         NEXT
         dbSkip()
     ENDDO
-    OutStd("200 SUCCESS")
+    OutStd('UPDATED:' + allTrim(Str(updatedCount)))
+    OutStd(hb_eol() + "200 SUCCESS")
 
-RETURN 0
+RETURN ErrorLevel()

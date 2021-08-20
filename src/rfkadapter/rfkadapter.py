@@ -302,17 +302,19 @@ class DBFAdapter:
                 os.remove(fname)
         return True
 
-    # @TODO: rewrite these static interface methods as decorators when not too lazy
     @staticmethod
     def _update(update_package, db_path, table_name, index_files, _EXE=_EXE):
         table_name = table_name.split('.')[0]
-        f, fd, fname = None, None, None
+        f, fd, fname, updated_count = None, None, None, None
         try:
             fd, fname = tempfile.mkstemp(prefix='dbfu', suffix='.json', text=True)
             f = os.fdopen(fd, 'w')
             data = json.dump(update_package, f)
             f.close()
             ext = subprocess.run([_EXE, "update", db_path, table_name, fname, *index_files, '//noalert'], timeout=10, text=True, capture_output=True)
+            updated_count = ext.stdout.split('\n')
+            updated_count = updated_count[0].split(':') if len(updated_count) > 0 else None
+            updated_count = updated_count[1] if len(updated_count) > 0 else None
             if ext.returncode != 0:
                 raise HarbourError(ext.stderr)
         finally:
@@ -320,7 +322,7 @@ class DBFAdapter:
                 f.close()
             if fname:
                 os.remove(fname)
-        return True
+        return int(updated_count)
 
     def _locate_index_files(self):
         """Finds index files for db if they exist, **VERY MUCH** case sensitive"""
