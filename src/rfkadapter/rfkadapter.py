@@ -69,6 +69,8 @@ class Type:
     PICTURE = ord('P')
     TIMESTAMP = ord('@')
 
+_FNAME, _COMP, _VALUE = 0, 1, 2
+
 class Field:
     """Field class represents the meta DBF header field"""
     def __init__(self, name, ftype, length, decimals, is_padded=None, pad=None, ctype=Type.NULL):
@@ -142,29 +144,26 @@ class Field:
 
     def ctof(self, value):
         """converst ctype values back into native ftype with padding and all"""
-        if self.ftype == Type.INTEGER:
-            return int(value)
-        if self.ftype == Type.NUMERIC:
-            return float(value)
-        if self.ftype == Type.CHAR:
-            if self.ctype == Type.INTEGER:
-                if isinstance(value, int):
-                    if self.is_padded:
-                        return self._pad(str(value))
-                    else:
-                        return str(value)
-            if self.is_padded and isinstance(value, str):
-                return self._pad(value)
-        if self.ftype == Type.DATE:
-            if isinstance(value, str):
-                if len(value) == 8:
-                    return Field.dtoiso(value)
-                if len(value) == 10:
-                    return value
-            raise ValueError('Incorrect date value: %s' % value)
-        if self.ftype == Type.LOGICAL:
-            if isinstance(value, str):
-                return True if value == 'T' else False
+        if value != None:
+            if self.ftype == Type.INTEGER:
+                return int(value)
+            if self.ftype == Type.NUMERIC:
+                return float(value)
+            if self.ftype == Type.CHAR:
+                if self.is_padded:
+                    return self._pad(str(value))
+                else:
+                    return str(value)
+            if self.ftype == Type.DATE:
+                if isinstance(value, str):
+                    if len(value) == 8:
+                        return Field.dtoiso(value)
+                    if len(value) == 10:
+                        return value
+                raise ValueError('Incorrect date value: %s' % value)
+            if self.ftype == Type.LOGICAL:
+                if isinstance(value, str):
+                    return True if value == 'T' else False
         return value
 
     @staticmethod
@@ -242,6 +241,7 @@ class DBFAdapter:
             self.index_files = self._locate_index_files()
             self._records = None
             self._meta = None
+            self._filter = []
         else:
             raise FileError('No such database exists.')
 
@@ -264,18 +264,19 @@ class DBFAdapter:
         return headers
 
     @staticmethod
-    def _export(db_path, table_name, index_files, _EXE=_EXE):
+    def _export(db_path, table_name, index_files, where=[], _EXE=_EXE):
         table_name = table_name.split('.')[0]
         records, f, fd, fname = [], None, None, None
         try:
-            fd, fname = tempfile.mkstemp(prefix='dbfx', suffix='.csv', text=True)
+            fd, fname = tempfile.mkstemp(prefix='dbfx', suffix='.cson', text=True)
+            with open(fname, 'w') as f:
+                json.dump(where, f)
             ext = subprocess.run([_EXE, "export", db_path, table_name, fname, *index_files, '//noalert'], timeout=10, text=True, capture_output=True)
             if ext.returncode != 0:
                 raise HarbourError(ext.stderr)
-            f = os.fdopen(fd, 'r')
-            csvf = csv.reader(f)
-            for record in csvf:
-                records.append(record)
+            with open(fname, 'r') as f:
+                csvf = csv.reader(f)
+                records = [r for r in csvf]
         finally:
             if f:
                 f.close()
@@ -344,7 +345,7 @@ class DBFAdapter:
     def __iter__(self):
         if not self._meta:
             self._parse_meta()
-        records = DBFAdapter._export(self.db_path, self.table_name, self.index_files)
+        records = DBFAdapter._export(self.db_path, self.table_name, self.index_files, self._filter)
         return DBFIterator(records, [k for k, v in self._meta.items() if v[1] != Type.MEMO] )
 
     def field_info(self, field_name):
@@ -505,35 +506,24 @@ class RFKAdapter(DBFAdapter):
         without any further prep.
         - `infer_type` flag forces using inferred types everywhere
         """
-        # @TODO:R - REFACTOR, JSON FILTERS
         result = []
         fields = [k for k, v in self._meta.items() if v[1] != Type.MEMO]
-        for field_name, constr in where:
-            if field_name not in fields:
-                raise FieldError('No field with name %s in table %s' % (field_name, self.table_name))
-                return
+
+        self._filter = self._convert_conditions(where)
+
         for record in self._table:
-            satisfies = True
-            for field_name, constr in where:
-                value = RFKAdapter._prepare_value(record[field_name])
-                if infer_type:
-                    value = self.header_fields[field_name].ftoc(value)
-                if not constr(value):
-                    satisfies = False
-                    break
-            if satisfies:
-                result_record = {}
-                for field_name in fields:
-                    result_value = record[field_name]
-                    if not raw_result:
-                        result_value = RFKAdapter._prepare_value(result_value)
-                        if infer_type:
-                            try:
-                                result_value = self.header_fields[field_name].ftoc(result_value)
-                            except ValueError:
-                                pass
-                    result_record[field_name] = result_value
-                result.append(result_record)
+            result_record = {}
+            for field_name in fields:
+                result_value = record[field_name]
+                if not raw_result:
+                    result_value = RFKAdapter._prepare_value(result_value)
+                    if infer_type:
+                        try:
+                            result_value = self.header_fields[field_name].ftoc(result_value)
+                        except ValueError:
+                            pass
+                result_record[field_name] = result_value
+            result.append(result_record)
         return result
 
     def read(self, where=[]):
@@ -551,42 +541,40 @@ class RFKAdapter(DBFAdapter):
         """
         return self._read(where, infer_type=True)
 
-    def _convert_condition(self, column, comparator, constraint):
-        """Converts between convenience and filter condition styles
+    def _convert_conditions(self, conditions):
+        """Converts between convenience and JSON filter condition styles
 
         < (lt), > (gt), <= (lte), >= (gte), == (eq), != (neq)
         si - parcijalno uparivanje stringova bez obzira na mala i velika slova
         s - parcijalno uparivanje stringova uz razlikovanje malih i velikih slova
         x - uparivanje stringova korištenjem regularnih izraza (regex)
         """
-        _map = {
-            'lt': lambda x: x < self.header_fields[column].strtoc(constraint),
-            'gt': lambda x: x > self.header_fields[column].strtoc(constraint),
-            'lte': lambda x: x <= self.header_fields[column].strtoc(constraint),
-            'gte': lambda x: x >= self.header_fields[column].strtoc(constraint),
-            'eq': lambda x: x == self.header_fields[column].strtoc(constraint),
-            'neq': lambda x: x != self.header_fields[column].strtoc(constraint),
-            'si': lambda x: x.lower().find(constraint.lower()) >= 0,
-            's': lambda x: x.find(constraint) >= 0,
-            'x': lambda x: re.search(constraint, x) != None,
-        }
-        if comparator in ['si', 's', 'x'] and self.header_fields[column].ctype != Type.CHAR:
-            raise ValueError('invalid compararator for non string column type')
-        if comparator in _map:
-            return (column, _map[comparator])
-        else:
-            raise ValueError('invalid comparator %s' % comparator)
+        _where = []
+        _comparators = ['lt', 'gt', 'lte', 'gte', 'eq', 'neq', 'si', 's', 'x']
+        for condition in conditions:
+            if len(condition) != 3:
+                raise TypeError('Invalid filter. (NOTE: Old style lambda filters are deprecated, use convenience filters)')
+            if condition[_FNAME] not in self.header_fields.keys():
+                raise FieldError('No field with name %s in table %s' % (condition[_FNAME], self.table_name))
+            if condition[_COMP] in ['si', 's', 'x'] and self.header_fields[condition[_FNAME]].ctype != Type.CHAR:
+                raise ValueError('invalid comparator for non string column type')
+            if condition[_COMP] in _comparators:
+                _where.append({
+                    'column_name': condition[_FNAME],
+                    'comparator': condition[_COMP],
+                    'value': self.header_fields[condition[_FNAME]].ctof(condition[_VALUE])})
+            else:
+                raise ValueError('Invalid filter condition.')
+        return _where
 
-    def where(self, conditions=[]):
+    def where(self, where=[]):
         """Convenience filter method
 
         Written in order to facilitate external calls with conditions
         styled like: [('COL', 'gt', 'VALUE'), ('COL', 'lt', 'VALUE')]
-        conditions get type inferred and operators go lambdas
+        conditions get type inferred
         """
-        # @TODO: check columns exists before passing on
-        converted_conditions = [self._convert_condition(*c) for c in conditions]
-        return self.filter(converted_conditions)
+        return self.filter(where)
 
     def write(self, data):
         """Appends a new record to the table"""
@@ -601,33 +589,15 @@ class RFKAdapter(DBFAdapter):
 
     def update(self, what, where):
         """Updates existing records, returns True on success"""
-        _FNAME, _COMP, _VALUE = 0, 1, 2
-        _where = []
+        _what = {}
+        _dict_where = self._convert_conditions(where)
         if not self.header_fields:
             raise ValueError('header_fields not initialized, run self._parse_headers first!')
-        comparators = ['lt', 'gt', 'lte', 'gte', 'eq', 'neq', 'si', 's', 'x']
         for field_name, new_value in what.items():
             if field_name not in self.header_fields.keys():
                 raise FieldError('No field with name %s in table %s to update' % (field_name, self.table_name))
-            what[field_name] = self.header_fields[field_name].ctof(new_value)
-        for condition in where:
-            if len(condition) != 3:
-                raise TypeError('Invalid filter. (NOTE: Old style lambda filters are deprecated, use JSON filters)')
-            # @TODO: these validators should be moved upstream
-            # if not isinstance(condition, dict) or \
-            #         'column_name' not in condition.keys() or \
-            #         'comparator' not in condition.keys() or \
-            #         'value' not in condition.keys():
-            #     raise TypeError('Invalid filter.')
-            if condition[_COMP] not in comparators:
-                raise ValueError('Invalid filter condition.')
-            if condition[_FNAME] not in self.header_fields.keys():
-                raise FieldError('No field with name %s in table %s' % (condition[_FNAME], self.table_name))
-            _where.append({
-                'column_name': condition[_FNAME],
-                'comparator': condition[_COMP],
-                'value': self.header_fields[condition[_FNAME]].ctof(condition[_VALUE])})
-        return DBFAdapter._update({'what': what, 'where': _where}, self.db_path, self.table_name, self.index_files)
+            _what[field_name] = self.header_fields[field_name].ctof(new_value)
+        return DBFAdapter._update({'what': _what, 'where': _dict_where}, self.db_path, self.table_name, self.index_files)
 
     def _cache_headers(self):
         """Caches parsed headers to file because parsing is time demanding

@@ -6,6 +6,7 @@ FUNCTION MAIN(command)
     ErrorLevel(0)
     SET DELETED ON
     SET DATE FORMAT "yyyy-mm-dd"
+    hb_RegexHas('a', 'a') // *** HAS TO BE HERE IN ORDER TO LOAD THE FUNCTION! ***
 
     FOR i := 2 TO PCount()
         AAdd(args, hb_Pvalue(i))
@@ -13,13 +14,13 @@ FUNCTION MAIN(command)
 
     DO CASE
         CASE Upper(command) = "APPEND"
-            APPEND(args)
+            RETURN APPEND(args)
         CASE Upper(command) = "EXPORT"
-            EXPORT(args)
+            RETURN EXPORT(args)
         CASE Upper(command) = "HEAD"
-            HEAD(args)
+            RETURN HEAD(args)
         CASE Upper(command) = "UPDATE"
-            UPDATE(args)
+            RETURN UPDATE(args)
     ENDCASE
 
 FUNCTION HEAD(argv)
@@ -76,7 +77,18 @@ FUNCTION EXPORT(argv)
             RETURN ErrorLevel()
         ENDIF
     NEXT
+
     Set(_SET_FILECASE, 0)
+    where := hb_jsonDecode(memoRead(tmpfile))
+
+    filterString := rfk_CompileFilter(base, where)
+    IF .NOT. ValType(filterString) == 'C'
+        RETURN ErrorLevel()
+    ENDIF
+    
+    SET FILTER TO &(filterString)
+    GOTO TOP
+
     COPY TO (tmpfile) DELIMITED
     OutStd("200 SUCCESS")
 
@@ -112,40 +124,10 @@ FUNCTION APPEND(argv)
     dbSkip(0)
     OutStd("200 SUCCESS")
 
-FUNCTION UPDATE(argv)
-    LOCAL i, path, base, jsonFile, request := {}, keys, key, e, filterString := "", insets := {}, finVal, s, f, eType, updatedCount := 0
-    Set(_SET_FILECASE, 2)
-    IF Len(argv) < 3
-        ErrorLevel(1)
-        OutStd("400 ERROR. USAGE e.g: update ABS_DBPATH NAME.DBF ABSJSONFILEPATH [INDEX01.NTX ...]")
-        RETURN 1
-    ENDIF
-    path := argv[1]
-    base := argv[2]
-    jsonFile := argv[3]
-
-    Set(_SET_DEFAULT, hb_DirSepToOS(path))
-    USE (base)
-    IF !FLock()
-        ErrorLevel(50)
-        OutStd("500 ERROR. LOCKED")
-        RETURN ErrorLevel()
-    ENDIF
-    FOR i := 4 TO Len(argv)
-        SET INDEX TO (argv[i]) ADDITIVE
-        IF !FLock()
-            ErrorLevel(50)
-            OutStd("500 ERROR. LOCKED")
-            RETURN ErrorLevel()
-        ENDIF
-    NEXT
-    Set(_SET_FILECASE, 0)
-    request := hb_jsonDecode(memoRead(jsonFile))
-
-    // @TODO: solve escaping, escape C in 'where', preserve types
-    // @TODO: test in python
-    FOR i := 1 TO Len(request['where'])
-        e := request['where'][i]
+FUNCTION rfk_CompileFilter(base, where)
+    LOCAL filterString := ""
+    FOR i := 1 TO Len(where)
+        e := where[i]
         eType := ValType(&(base)->&(e['column_name']))
         DO CASE
             CASE eType == 'D'
@@ -189,13 +171,48 @@ FUNCTION UPDATE(argv)
                 OutStd("404 ERROR. INVALID FILTER PARAMETERS COMPARATOR OR VALUE PAIR")
                 RETURN ErrorLevel()
         ENDCASE
-        IF i < Len(request['where'])
+        IF i < Len(where)
             filterString := filterString + ' .AND. '
         ENDIF
     NEXT
+    RETURN filterString
+
+FUNCTION UPDATE(argv)
+    LOCAL i, path, base, jsonFile, request := {}, keys, key, e, filterString := "", insets := {}, finVal, s, f, eType, updatedCount := 0
+    Set(_SET_FILECASE, 2)
+    IF Len(argv) < 3
+        ErrorLevel(40)
+        OutStd("400 ERROR. USAGE e.g: update ABS_DBPATH NAME.DBF ABSJSONFILEPATH [INDEX01.NTX ...]")
+        RETURN ErrorLevel()
+    ENDIF
+    path := argv[1]
+    base := argv[2]
+    jsonFile := argv[3]
+
+    Set(_SET_DEFAULT, hb_DirSepToOS(path))
+    USE (base)
+    IF !FLock()
+        ErrorLevel(50)
+        OutStd("500 ERROR. LOCKED")
+        RETURN ErrorLevel()
+    ENDIF
+    FOR i := 4 TO Len(argv)
+        SET INDEX TO (argv[i]) ADDITIVE
+        IF !FLock()
+            ErrorLevel(50)
+            OutStd("500 ERROR. LOCKED")
+            RETURN ErrorLevel()
+        ENDIF
+    NEXT
+    Set(_SET_FILECASE, 0)
+    request := hb_jsonDecode(memoRead(jsonFile))
+
+    filterString := rfk_CompileFilter(base, request['where'])
+    IF .NOT. ValType(filterString) == 'C'
+        RETURN ErrorLevel()
+    ENDIF
     
     keys := hb_HKeys(request['what'])
-    hb_RegexHas('a', 'a') // *** HAS TO BE HERE IN ORDER TO LOAD THE FUNCTION! ***
     SET FILTER TO &(filterString)
     GOTO TOP
     DO WHILE !Eof()

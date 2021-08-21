@@ -101,33 +101,33 @@ class RFKAdapterTest(TestCase):
     def test_single_filtered_internal_read(self):
         """test internal _reading a record filtered by a single condition"""
         self._set_up()
-        result = self._adapter._read([('OTP_ULI', lambda x: x == '880')])
+        result = self._adapter._read([('OTP_ULI', 'eq', 880)])
         self.assertNotEqual(result, [])
         self.assertEqual(result[0]['OTP_ULI'], '880')
         self.assertEqual(result[0]['OBJ_ULI'], '010')
         self.assertEqual(result[0]['DOK_ULI'], '20')
         self.assertEqual(result[0]['SIF_ULI'], '00881')
-        result = self._adapter._read([('SIF_ULI', lambda x: x == '00870')])
+        result = self._adapter._read([('SIF_ULI', 'eq', 870)])
         self.assertNotEqual(result, [])
         self.assertEqual(result[0]['SIF_ULI'], '00870')
 
     def test_single_filtered_read(self):
         """test reading a single record filtered by a single condition"""
         self._set_up()
-        result = self._adapter.filter([('SIF_ULI', lambda x: x == 876)])
+        result = self._adapter.filter([('SIF_ULI', 'eq', 876)])
         self.assertNotEqual(result, [])
         self.assertEqual(result[0]['OTP_ULI'], '876')
         self.assertEqual(result[0]['OBJ_ULI'], 10)
         self.assertEqual(result[0]['DOK_ULI'], 20)
         self.assertEqual(result[0]['SIF_ULI'], 876)
-        result = self._adapter.filter([('SIF_ULI', lambda x: x == 870)])
+        result = self._adapter.filter([('SIF_ULI', 'eq', 870)])
         self.assertNotEqual(result, [])
         self.assertEqual(result[0]['SIF_ULI'], 870)
 
     def test_single_filtered_internal_raw_read(self):
         """test _reading a single raw record filtered by a single condition"""
         self._set_up()
-        result = self._adapter._read([('OTP_ULI', lambda x: x == '880')], raw_result=True)
+        result = self._adapter._read([('OTP_ULI', 'eq', 880)], raw_result=True)
         self.assertNotEqual(result, [])
         self.assertEqual(result[0]['OTP_ULI'], '880')
         self.assertEqual(result[0]['OBJ_ULI'], '010')
@@ -139,8 +139,8 @@ class RFKAdapterTest(TestCase):
         """test reading multiple record filtered by multiple conditions"""
         self._set_up()
         result = self._adapter._read([
-            ('OBJ_ULI', lambda x: x == '010'),
-            ('DOK_ULI', lambda x: x == '20'),
+            ('OBJ_ULI', 'eq', 10),
+            ('DOK_ULI', 'eq', 20),
             ])
         self.assertGreater(len(result), 0)
         for record in result:
@@ -151,8 +151,8 @@ class RFKAdapterTest(TestCase):
         """test reading multiple record filtered by multiple conditions"""
         self._set_up()
         result = self._adapter.read([
-            ('OBJ_ULI', lambda x: x == 10),
-            ('DOK_ULI', lambda x: x == 20),
+            ('OBJ_ULI', 'eq', 10),
+            ('DOK_ULI', 'eq', 20),
             ])
         self.assertGreater(len(result), 0)
         for record in result:
@@ -163,7 +163,7 @@ class RFKAdapterTest(TestCase):
         """test raising a FieldError on nonexistent field filter key"""
         self._set_up()
         try:
-            self.assertRaises(FieldError, self._adapter._read, [('SOK_ULI', lambda x: 'T')])
+            self.assertRaises(FieldError, self._adapter._read, [('SOK_ULI', 'eq', True)])
         except:
             pass
 
@@ -175,10 +175,10 @@ class RFKAdapterTest(TestCase):
     def test_record_append(self):
         """test appending a single record to the table"""
         self._set_up('ULIZ.DBF')
-        sample_record = {'OBJ_ULI': '010', 'DOK_ULI': '20', 'SIF_ULI': '00000', 'GOT_ULI': None, 'NAL_ULI': 'ADM', 'DAT_ULI': datetime(2021, 6, 14), 'OTP_ULI': '225883', 'NAO_ULI': None, 'DAI_ULI': datetime(2021, 6, 14), 'MIS_ULI': None, 'VAL_ULI': datetime(2021, 6, 14), 'DAN_ULI': 0, 'RBR_ULI': 2, 'KUF_ULI': '1234', 'ZAD_ULI': '001', 'PAR_ULI': '0196552', 'PRO_ULI': None, 'TRG_ULI': None, 'KAS_ULI': 0, 'PUT_ULI': '001', 'NAP_ULI': '', 'LIK_ULI': None, 'FIN_ULI': None, 'L0_ULI': False, 'L1_ULI': False, 'L2_ULI': False, 'L3_ULI': False, 'L4_ULI': False, 'L5_ULI': False, 'L6_ULI': False, 'L7_ULI': False, 'L8_ULI': False, 'L9_ULI': False, 'L1A_ULI': None, 'L2A_ULI': None, 'L3A_ULI': None, 'L4A_ULI': None, 'L5A_ULI': None, 'N1_ULI': 0, 'N2_ULI': 0, 'FIS_ULI': None, 'REK_ULI': None, 'STO_ULI': None, 'FRA_ULI': None, 'FRR_ULI': None, 'MJE_ULI': None, 'PAS_ULI': None, 'DAS_ULI': None, 'MTR_ULI': None}
+        sample_record = {'OBJ_ULI': '010', 'DOK_ULI': '20', 'SIF_ULI': '00000', 'GOT_ULI': None, 'NAL_ULI': 'ADM', 'DAT_ULI': datetime(2021, 6, 14), 'OTP_ULI': 'Škafiškafnjačić', 'NAO_ULI': None, 'DAI_ULI': datetime(2021, 6, 14), 'MIS_ULI': None, 'VAL_ULI': datetime(2021, 6, 14), 'DAN_ULI': 0, 'RBR_ULI': 2, 'KUF_ULI': '1234', 'ZAD_ULI': '001', 'PAR_ULI': '0196552', 'PRO_ULI': None, 'TRG_ULI': None, 'KAS_ULI': 0, 'PUT_ULI': '001', 'NAP_ULI': '', 'LIK_ULI': None, 'FIN_ULI': None, 'L0_ULI': False, 'L1_ULI': False, 'L2_ULI': False, 'L3_ULI': False, 'L4_ULI': False, 'L5_ULI': False, 'L6_ULI': False, 'L7_ULI': False, 'L8_ULI': False, 'L9_ULI': False, 'L1A_ULI': None, 'L2A_ULI': None, 'L3A_ULI': None, 'L4A_ULI': None, 'L5A_ULI': None, 'N1_ULI': 0, 'N2_ULI': 0, 'FIS_ULI': None, 'REK_ULI': None, 'STO_ULI': None, 'FRA_ULI': None, 'FRR_ULI': None, 'MJE_ULI': None, 'PAS_ULI': None, 'DAS_ULI': None, 'MTR_ULI': None}
         result = self._adapter._read([
-            ('OBJ_ULI', lambda x: x == '010'),
-            ('DOK_ULI', lambda x: x == '20'),
+            ('OBJ_ULI', 'eq', 10),
+            ('DOK_ULI', 'eq', 20),
             ])
         fresh_row_id = str(max([int(record['SIF_ULI']) for record in result]) + 1).zfill(5)
         sample_record['SIF_ULI'] = fresh_row_id
@@ -186,10 +186,12 @@ class RFKAdapterTest(TestCase):
         self._adapter = None
         self._set_up('ULIZ.DBF')
         result = self._adapter.read([
-            ('OBJ_ULI', lambda x: x == 10),
-            ('DOK_ULI', lambda x: x == 20),
+            ('OBJ_ULI', 'eq', 10),
+            ('DOK_ULI', 'eq', 20),
             ])
         self.assertEqual(result[-1]['SIF_ULI'], int(fresh_row_id))
+        self.assertEqual(result[-1]['OTP_ULI'], 'Škafiškafnjačić')
+        
 
     def test_determine_char_field_is_int(self):
         """tests determining if the char field is an integer value"""
@@ -339,15 +341,15 @@ class RFKAdapterTest(TestCase):
         # @TODO: testirati dodavanje afrikata i coded karaktera
         sample_record = {'OBJ_ULI': 10, 'DOK_ULI': 20, 'SIF_ULI': 0, 'GOT_ULI': None, 'NAL_ULI': 'ADM', 'DAT_ULI': '2021-07-07', 'OTP_ULI': '225883', 'NAO_ULI': None, 'DAI_ULI': '2021-06-14', 'MIS_ULI': None, 'VAL_ULI': datetime(2021, 6, 14), 'DAN_ULI': 0, 'RBR_ULI': 2, 'KUF_ULI': '1234', 'ZAD_ULI': '001', 'PAR_ULI': '0196552', 'PRO_ULI': None, 'TRG_ULI': None, 'KAS_ULI': 0, 'PUT_ULI': '001', 'NAP_ULI': '', 'LIK_ULI': None, 'FIN_ULI': None, 'L0_ULI': False, 'L1_ULI': False, 'L2_ULI': False, 'L3_ULI': False, 'L4_ULI': False, 'L5_ULI': False, 'L6_ULI': False, 'L7_ULI': False, 'L8_ULI': False, 'L9_ULI': False, 'L1A_ULI': None, 'L2A_ULI': None, 'L3A_ULI': None, 'L4A_ULI': None, 'L5A_ULI': None, 'N1_ULI': 0, 'N2_ULI': 0, 'FIS_ULI': None, 'REK_ULI': None, 'STO_ULI': None, 'FRA_ULI': None, 'FRR_ULI': None, 'MJE_ULI': None, 'PAS_ULI': None, 'DAS_ULI': None, 'MTR_ULI': None}
         result = self._adapter._read([
-            ('OBJ_ULI', lambda x: x == '010'),
-            ('DOK_ULI', lambda x: x == '20'),
+            ('OBJ_ULI', 'eq', 10),
+            ('DOK_ULI', 'eq', 20),
             ])
         fresh_row_id = str(max([int(record['SIF_ULI']) for record in result]) + 1).zfill(5)
         sample_record['SIF_ULI'] = int(fresh_row_id)
         self._adapter.write(sample_record)
         result = self._adapter.read([
-            ('OBJ_ULI', lambda x: x == 10),
-            ('DOK_ULI', lambda x: x == 20),
+            ('OBJ_ULI', 'eq', 10),
+            ('DOK_ULI', 'eq', 20),
             ])
         self.assertEqual(result[-1]['SIF_ULI'], int(fresh_row_id))
         # NOTE: Ensures indexes get updated as well
@@ -369,9 +371,9 @@ class RFKAdapterTest(TestCase):
             ])
         self.assertEqual(success, True)
         outcome = self._adapter.filter([
-            ('OBJ_ULI', lambda x: x == 10),
-            ('DOK_ULI', lambda x: x == 20),
-            ('SIF_ULI', lambda x: x == 915),
+            ('OBJ_ULI', 'eq', 10),
+            ('DOK_ULI', 'eq', 20),
+            ('SIF_ULI', 'eq', 915),
             ])
         self.assertNotEqual(outcome, [])
         self.assertEqual(outcome[-1]['DAT_ULI'], today)
@@ -399,9 +401,10 @@ class RFKAdapterTest(TestCase):
         self.assertNotEqual(success, None)
         self.assertEqual(success > 0, True)
         outcome = self._adapter.filter([
-            ('OBJ_ULI', lambda x: x == 10),
-            ('DOK_ULI', lambda x: x == 20),
-            ('SIF_ULI', lambda x: x >= 800 and x < 810),
+            ('OBJ_ULI', 'eq', 10),
+            ('DOK_ULI', 'eq', 20),
+            ('SIF_ULI', 'gte', 800),
+            ('SIF_ULI', 'lt', 810),
             ])
         self.assertNotEqual(outcome, [])
         for record in outcome:
@@ -432,7 +435,7 @@ class RFKAdapterTest(TestCase):
     def test_is_char_column_padded_string(self):
         """tests determining whether char string column is padded and how"""
         self._set_up()
-        result = self._adapter._read([('SIF_ULI', lambda x: x == '00911')], raw_result=True)
+        result = self._adapter._read([('SIF_ULI', 'eq', 911)], raw_result=True)
         self.assertNotEqual(result, [])
         self.assertEqual(result[0]['SIF_ULI'], '00911')
 
@@ -447,9 +450,9 @@ class RFKAdapterTest(TestCase):
         outcome = self._adapter.filter([])
         self.assertGreater(len(outcome), 0)
         outcome = self._adapter.filter(
-            [('OBJ_ULI', lambda x: x == 10),
-            ('DOK_ULI', lambda x: x == 20),
-            ('SIF_ULI', lambda x: x == 915)])
+            [('OBJ_ULI', 'eq', 10),
+            ('DOK_ULI', 'eq', 20),
+            ('SIF_ULI', 'eq', 915)])
         self.assertEqual(len(outcome), 1)
         self.assertEqual(outcome[0]['OBJ_ULI'], 10)
         self.assertEqual(outcome[0]['DOK_ULI'], 20)
@@ -537,6 +540,13 @@ class RFKAdapterTest(TestCase):
         mock_field = self._adapter.header_fields['SIF_ULI']
         outcome = mock_field.ctof('123')
         self.assertEqual(outcome, '00123')
+        mock_field = self._adapter.header_fields['OTP_ULI']
+        outcome = mock_field.ctof('123')
+        self.assertEqual(outcome, '123')
+        outcome = mock_field.ctof(123)
+        self.assertEqual(outcome, '123')
+        outcome = mock_field.ctof('Škafiškafnjak')
+        self.assertEqual(outcome, 'Škafiškafnjak')
         mock_field = self._adapter.header_fields['DAT_ULI']
         outcome = mock_field.ctof('2021-07-09')
         self.assertEqual(outcome, '2021-07-09')
@@ -563,58 +573,26 @@ class RFKAdapterTest(TestCase):
         outcome = mock_field.ctof(False)
         self.assertEqual(outcome, False)
 
-    def test_convert_condition(self):
+    def test_convert_conditions(self):
         """tests if convenience style where conditions get translated correctly"""
         self._set_up()
-        outcome = self._adapter._convert_condition('SIF_ULI', 'eq', '123')
-        self.assertEqual(outcome[0], 'SIF_ULI')
-        self.assertEqual(outcome[1](123), True)
+        outcome = self._adapter._convert_conditions([('SIF_ULI', 'eq', '123')])
+        outcome = outcome[0]
+        self.assertEqual(outcome['column_name'], 'SIF_ULI')
+        self.assertEqual(outcome['comparator'], 'eq')
+        self.assertEqual(outcome['value'], '00123')
         try:
-            self.assertRaises(ValueError, self._adapter._convert_condition('SIF_ULI', 'x', '123'))
-            self.assertRaises(ValueError, self._adapter._convert_condition('SIF_ULI', 'si', '123'))
-            self.assertRaises(ValueError, self._adapter._convert_condition('SIF_ULI', 's', '123'))
-            self.assertRaises(ValueError, self._adapter._convert_condition('SIF_ULI', 're', '123'))
+            self.assertRaises(ValueError, self._adapter._convert_conditions([('SIF_ULI', 'x', '123')]))
+            self.assertRaises(ValueError, self._adapter._convert_conditions([('SIF_ULI', 'si', '123')]))
+            self.assertRaises(ValueError, self._adapter._convert_conditions([('SIF_ULI', 's', '123')]))
+            self.assertRaises(ValueError, self._adapter._convert_conditions([('SIF_ULI', 're', '123')]))
         except:
             pass
-        outcome = self._adapter._convert_condition('DAT_ULI', 'eq', '2021-07-09')
-        self.assertEqual(outcome[0], 'DAT_ULI')
-        self.assertEqual(outcome[1]('2021-07-09'), True)
-        outcome = self._adapter._convert_condition('DAT_ULI', 'neq', '2021-07-09')
-        self.assertEqual(outcome[1]('2021-07-10'), True)
-        self.assertEqual(outcome[1]('2021-07-09'), False)
-        outcome = self._adapter._convert_condition('DAT_ULI', 'lt', '2021-07-09')
-        self.assertEqual(outcome[1]('2021-07-08'), True)
-        self.assertEqual(outcome[1]('2021-07-09'), False)
-        self.assertEqual(outcome[1]('2021-07-10'), False)
-        outcome = self._adapter._convert_condition('DAT_ULI', 'gt', '2021-07-09')
-        self.assertEqual(outcome[1]('2021-07-08'), False)
-        self.assertEqual(outcome[1]('2021-07-09'), False)
-        self.assertEqual(outcome[1]('2021-07-10'), True)
-        outcome = self._adapter._convert_condition('DAT_ULI', 'lte', '2021-07-09')
-        self.assertEqual(outcome[1]('2021-07-08'), True)
-        self.assertEqual(outcome[1]('2021-07-09'), True)
-        self.assertEqual(outcome[1]('2021-07-10'), False)
-        outcome = self._adapter._convert_condition('DAT_ULI', 'gte', '2021-07-09')
-        self.assertEqual(outcome[1]('2021-07-08'), False)
-        self.assertEqual(outcome[1]('2021-07-09'), True)
-        self.assertEqual(outcome[1]('2021-07-10'), True)
-        outcome = self._adapter._convert_condition('MIS_ULI', 'eq', '')
-        self.assertEqual(outcome[0], 'MIS_ULI')
-        self.assertEqual(outcome[1](None), True)
-        outcome = self._adapter._convert_condition('KUF_ULI', 'eq', '123')
-        self.assertEqual(outcome[0], 'KUF_ULI')
-        self.assertEqual(outcome[1]('123'), True)
-        self.assertEqual(outcome[1](123), False)
-        outcome = self._adapter._convert_condition('KUF_ULI', 'si', 'skaf')
-        self.assertEqual(outcome[1]('SkAfIsKaFnJaK'), True)
-        self.assertEqual(outcome[1]('1234'), False)
-        outcome = self._adapter._convert_condition('KUF_ULI', 's', 'skaf')
-        self.assertEqual(outcome[1]('SkAfIsKaFnJaK'), False)
-        self.assertEqual(outcome[1]('skafiskafnjak'), True)
-        outcome = self._adapter._convert_condition('KUF_ULI', 'x', '^SkAf.*')
-        self.assertEqual(outcome[1]('SkAfIsKaFnJaK'), True)
-        self.assertEqual(outcome[1]('IsKaFnJaKSkAf'), False)
-        self.assertEqual(outcome[1]('skafiskafnjak'), False)
+        outcome = self._adapter._convert_conditions([('DAT_ULI', 'eq', '2021-07-09')])
+        outcome = outcome[0]
+        self.assertEqual(outcome['column_name'], 'DAT_ULI')
+        self.assertEqual(outcome['comparator'], 'eq')
+        self.assertEqual(outcome['value'], '2021-07-09')
 
     def test_field_strtoc(self):
         """tests if string values get converted to column typed value correctly"""
