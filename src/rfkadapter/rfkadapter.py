@@ -229,7 +229,7 @@ class DBFIterator:
         else:
             raise StopIteration
 
-_EXE = '/home/koljenovic/code/refko/rfk/harbour/dbfadapter'
+_EXE = 'dbfadapter'
 
 class DBFAdapter:
     def __init__(self, db_path, table_name, mode='-', index_suffix='ntx'):

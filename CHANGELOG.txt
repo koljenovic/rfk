@@ -1,4 +1,6 @@
+0.3.1
+- naming issue resolution version
 0.3.0
 - whole new Harbour dbfadapter
-- old style lambda filters deprecated in favor of new style json filters
+- old style lambda filters deprecated in favor of new compact filters
 - dbf dependency removed

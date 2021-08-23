@@ -1,16 +1,28 @@
-# Harbour API 0.2.1
+# DBFAdapter b.1.0
 
-Datoteke `.prg ` su Harbour (https://github.com/harbour/core) interfejs prema DBF bazama i trenutno samo nadopunjavaju nedostajuće funkcionalnosti dbf modula, u bućnosti kompletan modul treba zamijeniti Harbour interfejsom.
+`.prg` files are Harbour (https://github.com/harbour/core) interface to DBF databases. In order to successfully use the RFKAdapter package it's neccessary for DBFAdapter to be present on the target system. The compilation process for Debian based linux systems is briefly described below.
+***
+Datoteke `.prg ` su Harbour (https://github.com/harbour/core) interfejs prema DBF bazama podataka. Za uspješno korištenje RFKAdapter paketa neophodno je prethodno osigurati da je izvršna verzija DBFAdapter-a dostupna na ciljnom sistemu. Proces kompilacije za Debian bazirane linux sisteme ukratko je dat ispod.
 
-## Kompilacija
+## Compile
 
+**Required packages**
+
+* ANSI C compiler (gcc)
+* GNU Make (3.81, minimum 3.79)
+* Harbour source code (2.0.0 or upper)
+
+In order to use RFKAdapter it's first neccessary to compile `.prg` source code into executables and this requires a functioning Harbour compiler, which can be obtained by compiling it as described below:
+***
 **Neophodni paketi:**
 
 * ANSI C kompajler (gcc)
 * GNU Make (3.81, minimum 3.79)
-* Harbour izvorni kod (2.0.0 or upper)
+* Harbour izvorni kod (2.0.0 ili iznad)
 
-Za korištenje Harbour funkcionalnosti neophodno je izvršiti kompilaciju vašeg `.prg` izvornog koda u izvršne datoteke, za to vam je potreban Harbour kompajler koji možete kompajlirati kao u narednom primjeru za Ubuntu/Debian:
+Za korištenje RFKAdapter neophodno je izvršiti kompilaciju vašeg `.prg` izvornog koda u izvršne datoteke, no za to vam je neophodan Harbour kompajler. Sam Harbour kompajler možete kompajlirati kao u narednom primjeru za Ubuntu/Debian:
+
+### Harbour
 
 ```bash
 sudo apt install make
@@ -33,12 +45,18 @@ cd core
 make
 ```
 
+### Docs
+
+Detailed compilation instructions for different operating systems are available at:
+***
 Detaljna kompilacijska uputstva za različite operacione sisteme dostupna na: 
 * https://github.com/harbour/core#linux-deb-based-distros-debian-ubuntu
 * http://www.kresin.ru/en/hrbfaq.html#Install5
 
-### .prg kompilacija
+## .prg 
 
+Compiling the `*.prg` files into executables can be easily achieved by using the `./build` script:
+***
 Za kompilaciju `*.prg` datoteka u izvršne datoteke koristite `./build` skriptu:
 
 ```bash
@@ -46,15 +64,27 @@ HB_INS="./core"
 $HB_INS/bin/linux/gcc/harbour $1.prg -n -q0 -es2 -gc0 -I$HB_INS/include
 gcc -I. -I$HB_INS/include -Wall -c $1.c -o$1.o
 gcc -Wall -o$1 $1.o -L $HB_INS/lib/linux/gcc/ \
-      -Wl,--start-group -lhbvm -lhbrtl -lhblang -lhbrdd \
-      -lhbmacro -lhbpp -lhbcommon -lrddntx -lrddcdx -lrddfpt -lhbsix \
-      -lhbct -lgttrm -lhbcpage -Wl,--end-group -lm -lgpm
+      -Wl,--start-group -lbz2 -lhbcomm -lhbmacro -lhbsqlit3 -llzf -lgtalleg \
+      -lhbmemio -lhbssl -lminilzo -lgtcgi -lhbcpage -lhbmisc -lhbtcpio \
+      -lminizip -lgtcrs -lhbcplr -lhbmlzo -lhbtest -lmxml -lgtpca -lhbct \
+      -lhbmxml -lhbtinymt -lpng -lgtsln -lhbdebug -lhbmzip -lhbtip -lrddbm \
+      -lgtstd -lhbexpat -lhbnetio -lhbtpathy -lrddcdx -lgttrm -lhbextern \
+      -lhbnf -lhbuddall -lrddfpt -lgtxwc -lhbformat -lhbunix \
+      -lrddnsx -lhbfoxpro -lhbusrrdd -lrddntx -lhbfship -lhboslib \
+      -lhbvm -lrddsql -lhbgt -lhbpcre -lhbvmmt -lsddsqlt3 -lhbamf -lhbgzio \
+      -lhbpipeio -lhbxdiff -ltiff -lhbblink -lhbhpdf -lhbpp -lhbxpp -ltinymt \
+      -lhbbz2 -lhbhsx -lhbrdd -lhbzebra -lxdiff -lhbbz2io -lhbhttpd -lhbrtl \
+      -lhbziparc -lxhb -lhbcairo -lhblang -lhbsix -ljpeg -lhbcomio -lhblzf \
+      -lhbsms -llibhpdf -lhbcommon -lpcre -Wl,--end-group -lm -lgpm
 ```
 
-Više detalja na:
+After the compilation, for the system to be able to find the DBFAdapter executable it's necessary to copy `dbfadapter` into a search `path` directory, e.g. `/usr/local/bin/`. More details below.
+***
+Nakon kompilacije, a da bi sistem mogao pronaći izvršnu DBFAdapter datoteku neophodno je prekopirati `dbfadapter` u neki od `path` direktorija npr. `/usr/local/bin/`. Više detalja ispod.
+
 * http://www.kresin.ru/en/hrbfaq.html#Compile3
 
-## Harbour dokumentacija
+## Harbour Docs
 
 * https://harbour.github.io/doc/
 * https://harbour.wiki/
@@ -71,7 +101,7 @@ Više detalja na:
 * https://gnosis.cx/publish/programming/harbour.html
 * http://www.fivetechsoft.com/harbour-docs/command.html
 
-## Alati
+## Tools
 
 * https://medium.com/harbour-magazine/visual-studio-code-for-harbour-e148f9c1861a
 * https://github.com/APerricone/harbourCodeExtension

@@ -1,30 +1,33 @@
 import setuptools
 
-with open("README", "r", encoding="utf-8") as fh:
+with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
 	name = "rfkadapter",
-	version = "0.2.1",
+	version = "0.3.1",
 	author = "Malik Koljenović",
 	author_email = "malik@mekom.ba",
-	description = "RFKAdapter emulira API nalik SQL jeziku (SELECT, UPDATE, CREATE) za DBF \"baze podataka\"",
+	description = "RFKAdapter emulates a SQL-like CRUD API for DBF",
 	long_description = long_description,
 	long_description_content_type = "text/markdown",
-	url = "https://gitea.lab.ba/mekom/rfk",
+	url = "https://github.com/koljenovic/rfk",
 	project_urls = {
-		"Bug Tracker": "https://gitea.lab.ba/mekom/rfk/issues"
+		"Bug Tracker": "https://github.com/koljenovic/rfk/issues"
 	},
 	classifiers =[
 		"Programming Language :: Python :: 3",
 		"License :: OSI Approved :: MIT License",
 		"Operating System :: OS Independent",
+		"Development Status :: 4 - Beta",
+		"Natural Language :: Bosnian",
+		"Natural Language :: English",
+		"Programming Language :: Other",
+		"Topic :: Software Development :: Libraries :: Python Modules",
+		"Topic :: Database :: Front-Ends"
 	],
 
 	package_dir = { "": "src" },
 	packages = setuptools.find_packages(where="src"),
-    install_requires = [
-        "aenum",
-    ],
 	python_requires = ">=3.7",
 )

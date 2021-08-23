@@ -4,10 +4,10 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-aenum = "*"
 
 [dev-packages]
 build = "*"
+twine = "*"
 
 [requires]
 python_version = "3.9"
