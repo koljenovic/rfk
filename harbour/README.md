@@ -63,13 +63,13 @@ Za kompilaciju `*.prg` datoteka u izvršne datoteke koristite `./build` skriptu:
 HB_INS="./core"
 $HB_INS/bin/linux/gcc/harbour $1.prg -n -q0 -es2 -gc0 -I$HB_INS/include
 gcc -I. -I$HB_INS/include -Wall -c $1.c -o$1.o
-gcc -Wall -o$1 $1.o -L $HB_INS/lib/linux/gcc/ \
-      -Wl,--start-group -lbz2 -lhbcomm -lhbmacro -lhbsqlit3 -llzf -lgtalleg \
+gcc -static -Wall -o$1 $1.o -L $HB_INS/lib/linux/gcc/ \
+      -Wl,--start-group -lpthread -lbz2 -lhbcomm -lhbmacro -llzf -lgtalleg \
       -lhbmemio -lhbssl -lminilzo -lgtcgi -lhbcpage -lhbmisc -lhbtcpio \
       -lminizip -lgtcrs -lhbcplr -lhbmlzo -lhbtest -lmxml -lgtpca -lhbct \
       -lhbmxml -lhbtinymt -lpng -lgtsln -lhbdebug -lhbmzip -lhbtip -lrddbm \
       -lgtstd -lhbexpat -lhbnetio -lhbtpathy -lrddcdx -lgttrm -lhbextern \
-      -lhbnf -lhbuddall -lrddfpt -lgtxwc -lhbformat -lhbunix \
+      -lhbnf -lhbuddall -lrddfpt -lgtxwc -lhbformat -lhbunix -lhbsqlit3 \
       -lrddnsx -lhbfoxpro -lhbusrrdd -lrddntx -lhbfship -lhboslib \
       -lhbvm -lrddsql -lhbgt -lhbpcre -lhbvmmt -lsddsqlt3 -lhbamf -lhbgzio \
       -lhbpipeio -lhbxdiff -ltiff -lhbblink -lhbhpdf -lhbpp -lhbxpp -ltinymt \

@@ -340,7 +340,7 @@ class DBFAdapter:
         header = json.loads(DBFAdapter._head(self.db_path, self.table_name))
         header = [x[1:-1].split(',') for x in header]
         header = [[y.strip() for y in x] for x in header]
-        self._meta = { x[0]: (x[0], ord(x[1]), int(x[2]), int(x[3])) for x in header }
+        self._meta = { x[0]: (x[0], ord(x[1][0]), int(x[2]), int(x[3])) for x in header }
 
     def __iter__(self):
         if not self._meta:
@@ -537,7 +537,7 @@ class RFKAdapter(DBFAdapter):
     def filter(self, where=[]):
         """Returns all filtered DBF values, best effort type inferred
 
-        where e.g. [('OBJ_ULI', lambda x: x == '010')]
+        where e.g. [('OBJ_ULI', 'eq', 10)]
         """
         return self._read(where, infer_type=True)
 
@@ -588,7 +588,7 @@ class RFKAdapter(DBFAdapter):
         self._append(line, self.db_path, self.table_name, self.index_files)
 
     def update(self, what, where):
-        """Updates existing records, returns True on success"""
+        """Updates existing records, updated count on success"""
         _what = {}
         _dict_where = self._convert_conditions(where)
         if not self.header_fields:
