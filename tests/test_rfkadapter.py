@@ -29,11 +29,11 @@ class DBFAdapterTest(TestCase):
         self._db_path = os.path.dirname(os.path.realpath(__file__)) + '/data/'
         super(DBFAdapterTest, self).__init__(*args, **kwds)
 
-    def _set_up(self, table_name='ULIZ.DBF'): 
-        self._adapter = DBFAdapter(self._db_path, table_name)
+    def _set_up(self, table_name='ULIZ.DBF', code_page='cp852'): 
+        self._adapter = DBFAdapter(self._db_path, table_name, code_page)
 
     def test_head_read(self):
-        headers = json.loads(DBFAdapter._head(self._db_path, 'ULIZ.DBF'))
+        headers = json.loads(DBFAdapter._head(self._db_path, 'ULIZ.DBF', 'cp852'))
         self.assertEqual(headers[-1], "<MTR_ULI, C, 7, 0>")
 
     def test_parse_meta(self):
@@ -44,7 +44,7 @@ class DBFAdapterTest(TestCase):
         self.assertEqual('NAP_ULI' in self._adapter._meta, True)
 
     def test_export(self):
-        outcome = DBFAdapter._export(self._db_path, 'ULIZ.DBF', ['ULIZ01', 'ULIZ02', 'ULIZ03'])
+        outcome = DBFAdapter._export(self._db_path, 'ULIZ.DBF', ['ULIZ01', 'ULIZ02', 'ULIZ03'], [], 'cp852')
         self.assertEqual(len(outcome) > 500, True)
 
     def test_indices_get_found(self):
@@ -74,7 +74,7 @@ class DBFAdapterTest(TestCase):
         """ basic _update smoke test to establish that input gets parsed OK """
         with open(self._db_path + '/dbfadapter/update.json') as f:
             package = json.load(f)
-            outcome = DBFAdapter._update(package, self._db_path, 'ULIZ.DBF', ['ULIZ01', 'ULIZ02', 'ULIZ03'])
+            outcome = DBFAdapter._update(package, self._db_path, 'ULIZ.DBF', ['ULIZ01', 'ULIZ02', 'ULIZ03'], 'cp852')
             self.assertEqual(outcome > 0, True)
 
 class RFKAdapterTest(TestCase):
@@ -82,12 +82,12 @@ class RFKAdapterTest(TestCase):
         self._db_path = os.path.dirname(os.path.realpath(__file__)) + '/data/'
         super(RFKAdapterTest, self).__init__(*args, **kwds)
 
-    def _set_up(self, table_name='ULIZ.DBF', with_headers=True): 
-        self._adapter = RFKAdapter(self._db_path, table_name, with_headers=with_headers)
+    def _set_up(self, table_name='ULIZ.DBF', with_headers=True, code_page='cp852'): 
+        self._adapter = RFKAdapter(self._db_path, table_name, code_page, with_headers=with_headers)
 
     def test_basic_constructor(self):
         """test opening the table for reading"""
-        self._adapter = RFKAdapter(self._db_path, 'ULIZ.DBF')
+        self._adapter = RFKAdapter(self._db_path, 'ULIZ.DBF', code_page='cp852')
         self.assertEqual(self._adapter._table != None, True)
 
     def test_prepare_read_value(self):
@@ -187,6 +187,8 @@ class RFKAdapterTest(TestCase):
             ('SIF_ULI', 'eq', fresh_row_id)
             ])
         self.assertEqual(len(result), 1)
+        value = 'Škafiškafnjačić'
+        raw = value.encode('cp852')
         for k, v in sample_record.items():
             self.assertEqual(self._adapter.header_fields[k].ctof(result[-1][k]), self._adapter.header_fields[k].ctof(v))
 
