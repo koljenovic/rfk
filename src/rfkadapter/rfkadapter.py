@@ -92,15 +92,17 @@ class Field:
     def dtoiso(value):
         if isinstance(value, date) or isinstance(value, datetime):
             return value.isoformat()
-        else:
+        elif isinstance(value, str) and value != '':
             return date(int(value[:4]), int(value[4:6]), int(value[6:8])).isoformat()
+        return ''
 
     @staticmethod
     def isotod(value):
         if isinstance(value, date) or isinstance(value, datetime):
             return value.strftime('%Y%m%d')
-        else:
+        elif isinstance(value, str) and value != '':
             return date.fromisoformat(value).strftime('%Y%m%d')
+        return ''
 
     def _pad(self, value, length=None, pad=None, side=None):
         length = self.length if not length else length
@@ -156,11 +158,13 @@ class Field:
                     return str(value)
             if self.ftype == Type.DATE:
                 if isinstance(value, str):
+                    if value == '':
+                        return ''
                     if len(value) == 8:
                         return Field.dtoiso(value)
                     if len(value) == 10:
                         return value
-                raise ValueError('Incorrect date value: %s' % value)
+                raise ValueError('Incorrect date value: %s' % str(value))
             if self.ftype == Type.LOGICAL:
                 if isinstance(value, str):
                     return True if value == 'T' else False
@@ -579,14 +583,20 @@ class RFKAdapter(DBFAdapter):
 
     def write(self, data):
         """Appends a new record to the table"""
+        if not isinstance(data, dict):
+            raise TypeError('Invalid data type, row dict expected.')
         line = []
+        for k in data.keys():
+            if k not in self.header_fields.keys():
+                raise FieldError('No field with name %s in table %s' % (k, self.table_name))
         for _, field in self.header_fields.items():
-            if field.name in data:
-                if field.ftype != Type.MEMO:
+            if not field.is_type(Type.MEMO):
+                if field.name in data:
                     line.append(field.ctox(data[field.name]))
-            else:
-                line.append(field.ctox(None))
+                else:
+                    line.append(field.ctox(None))
         self._append(line, self.db_path, self.table_name, self.index_files)
+        return line
 
     def update(self, what, where):
         """Updates existing records, updated count on success"""
