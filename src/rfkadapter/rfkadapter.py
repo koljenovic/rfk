@@ -232,7 +232,7 @@ class DBFIterator:
 _EXE = 'dbfadapter'
 
 class DBFAdapter:
-    def __init__(self, db_path, table_name, mode='-', index_suffix='ntx'):
+    def __init__(self, db_path, table_name, mode='-', index_suffix='ntx', code_page='utf8'):
         if os.path.isfile(db_path + table_name):
             self._table = self
             self.db_path = db_path
@@ -242,6 +242,7 @@ class DBFAdapter:
             self._records = None
             self._meta = None
             self._filter = []
+            self.code_page = code_page
         else:
             raise FileError('No such database exists.')
 
@@ -264,7 +265,7 @@ class DBFAdapter:
         return headers
 
     @staticmethod
-    def _export(db_path, table_name, index_files, where=[], _EXE=_EXE):
+    def _export(db_path, table_name, index_files, where=[], code_page='utf8', _EXE=_EXE):
         table_name = table_name.split('.')[0]
         records, f, fd, fname = [], None, None, None
         try:
@@ -274,7 +275,7 @@ class DBFAdapter:
             ext = subprocess.run([_EXE, "export", db_path, table_name, fname, *index_files, '//noalert'], timeout=10, text=True, capture_output=True)
             if ext.returncode != 0:
                 raise HarbourError(ext.stderr)
-            with open(fname, 'r') as f:
+            with open(fname, 'r', encoding=code_page) as f:
                 csvf = csv.reader(f)
                 records = [r for r in csvf]
         finally:
@@ -345,7 +346,7 @@ class DBFAdapter:
     def __iter__(self):
         if not self._meta:
             self._parse_meta()
-        records = DBFAdapter._export(self.db_path, self.table_name, self.index_files, self._filter)
+        records = DBFAdapter._export(self.db_path, self.table_name, self.index_files, self._filter, code_page=self.code_page)
         return DBFIterator(records, [k for k, v in self._meta.items() if v[1] != Type.MEMO] )
 
     def field_info(self, field_name):
@@ -353,8 +354,8 @@ class DBFAdapter:
 
 # @TODO-EP-002: Determine mandatory header fields
 class RFKAdapter(DBFAdapter):
-    def __init__(self, db_path, table_name, mode='-', index_suffix='ntx', with_headers=True):
-        super(RFKAdapter, self).__init__(db_path, table_name, mode, index_suffix)
+    def __init__(self, db_path, table_name, mode='-', index_suffix='ntx', with_headers=True, code_page='utf8'):
+        super(RFKAdapter, self).__init__(db_path, table_name, mode, index_suffix, code_page=code_page)
         self._table = self
         base_name = os.path.splitext(self.table_name)[0]
         self._cache_path = os.path.join(self.db_path, base_name + '.json')
