@@ -236,7 +236,7 @@ class DBFIterator:
 _EXE = 'dbfadapter'
 
 class DBFAdapter:
-    def __init__(self, db_path, table_name, mode='-', index_suffix='ntx', code_page='utf8'):
+    def __init__(self, db_path, table_name, code_page, mode='-', index_suffix='ntx'):
         if os.path.isfile(db_path + table_name):
             self._table = self
             self.db_path = db_path
@@ -251,7 +251,7 @@ class DBFAdapter:
             raise FileError('No such database exists.')
 
     @staticmethod
-    def _head(db_path, table_name, _EXE=_EXE):
+    def _head(db_path, table_name, code_page, _EXE=_EXE):
         table_name = table_name.split('.')[0]
         headers, f, fd, fname = None, None, None, None
         try:
@@ -259,7 +259,7 @@ class DBFAdapter:
             ext = subprocess.run([_EXE, "head", db_path, table_name, fname, '//noalert'], timeout=10, text=True, capture_output=True)
             if ext.returncode != 0:
                 raise HarbourError(ext.stderr)
-            f = os.fdopen(fd, 'r')
+            f = os.fdopen(fd, 'r', encoding=code_page)
             headers = f.read()
         finally:
             if f:
@@ -269,13 +269,14 @@ class DBFAdapter:
         return headers
 
     @staticmethod
-    def _export(db_path, table_name, index_files, where=[], code_page='utf8', _EXE=_EXE):
+    def _export(db_path, table_name, index_files, where, code_page, _EXE=_EXE):
         table_name = table_name.split('.')[0]
         records, f, fd, fname = [], None, None, None
         try:
             fd, fname = tempfile.mkstemp(prefix='dbfx', suffix='.cson', text=True)
-            with open(fname, 'w') as f:
+            with open(fname, 'w', encoding=code_page) as f:
                 json.dump(where, f)
+            os.close(fd)
             ext = subprocess.run([_EXE, "export", db_path, table_name, fname, *index_files, '//noalert'], timeout=10, text=True, capture_output=True)
             if ext.returncode != 0:
                 raise HarbourError(ext.stderr)
@@ -290,12 +291,12 @@ class DBFAdapter:
         return records[:-1]
 
     @staticmethod
-    def _append(line, db_path, table_name, index_files, _EXE=_EXE):
+    def _append(line, db_path, table_name, index_files, code_page, _EXE=_EXE):
         table_name = table_name.split('.')[0]
         f, fd, fname = None, None, None
         try:
             fd, fname = tempfile.mkstemp(prefix='dbfa', suffix='.csv', text=True)
-            f = os.fdopen(fd, 'w')
+            f = os.fdopen(fd, 'w', encoding=code_page)
             f.write(','.join(line))
             f.close()
             ext = subprocess.run([_EXE, "append", db_path, table_name, fname, *index_files, '//noalert'], timeout=10, text=True, capture_output=True)
@@ -309,12 +310,12 @@ class DBFAdapter:
         return True
 
     @staticmethod
-    def _update(update_package, db_path, table_name, index_files, _EXE=_EXE):
+    def _update(update_package, db_path, table_name, index_files, code_page, _EXE=_EXE):
         table_name = table_name.split('.')[0]
         f, fd, fname, updated_count = None, None, None, None
         try:
             fd, fname = tempfile.mkstemp(prefix='dbfu', suffix='.json', text=True)
-            f = os.fdopen(fd, 'w')
+            f = os.fdopen(fd, 'w', encoding=code_page)
             data = json.dump(update_package, f)
             f.close()
             ext = subprocess.run([_EXE, "update", db_path, table_name, fname, *index_files, '//noalert'], timeout=10, text=True, capture_output=True)
@@ -342,7 +343,7 @@ class DBFAdapter:
         return indices
 
     def _parse_meta(self):
-        header = json.loads(DBFAdapter._head(self.db_path, self.table_name))
+        header = json.loads(DBFAdapter._head(self.db_path, self.table_name, code_page=self.code_page))
         header = [x[1:-1].split(',') for x in header]
         header = [[y.strip() for y in x] for x in header]
         self._meta = { x[0]: (x[0], ord(x[1][0]), int(x[2]), int(x[3])) for x in header }
@@ -358,8 +359,8 @@ class DBFAdapter:
 
 # @TODO-EP-002: Determine mandatory header fields
 class RFKAdapter(DBFAdapter):
-    def __init__(self, db_path, table_name, mode='-', index_suffix='ntx', with_headers=True, code_page='utf8'):
-        super(RFKAdapter, self).__init__(db_path, table_name, mode, index_suffix, code_page=code_page)
+    def __init__(self, db_path, table_name, code_page, mode='-', index_suffix='ntx', with_headers=True):
+        super(RFKAdapter, self).__init__(db_path, table_name, code_page, mode, index_suffix)
         self._table = self
         base_name = os.path.splitext(self.table_name)[0]
         self._cache_path = os.path.join(self.db_path, base_name + '.json')
@@ -595,7 +596,7 @@ class RFKAdapter(DBFAdapter):
                     line.append(field.ctox(data[field.name]))
                 else:
                     line.append(field.ctox(None))
-        self._append(line, self.db_path, self.table_name, self.index_files)
+        self._append(line, self.db_path, self.table_name, self.index_files, code_page=self.code_page)
         return line
 
     def update(self, what, where):
@@ -608,7 +609,7 @@ class RFKAdapter(DBFAdapter):
             if field_name not in self.header_fields.keys():
                 raise FieldError('No field with name %s in table %s to update' % (field_name, self.table_name))
             _what[field_name] = self.header_fields[field_name].ctof(new_value)
-        return DBFAdapter._update({'what': _what, 'where': _dict_where}, self.db_path, self.table_name, self.index_files)
+        return DBFAdapter._update({'what': _what, 'where': _dict_where}, self.db_path, self.table_name, self.index_files, code_page=self.code_page)
 
     def _cache_headers(self):
         """Caches parsed headers to file because parsing is time demanding
