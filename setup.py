@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
 	name = "rfkadapter",
-	version = "0.3.1",
+	version = "0.3.2",
 	author = "Malik Koljenović",
 	author_email = "malik@mekom.ba",
 	description = "RFKAdapter emulates a SQL-like CRUD API for DBF",

@@ -1,3 +1,7 @@
+0.3.2
+- text encoding support
+- bug fixes
+- dbfadapter static build
 0.3.1
 - naming issue resolution version
 0.3.0
