@@ -179,18 +179,12 @@ class Field:
         if self.ftype == Type.LOGICAL:
             return 'T' if value else 'F'
         if self.ftype == Type.CHAR:
-            if self.ctype == Type.INTEGER:
-                if isinstance(value, int):
+            if self.ctype == Type.INTEGER or self.ctype == Type.CHAR:
+                if value != None:
                     if self.is_padded and self.is_padded != 'R':
                         return Field.quote(self._pad(str(value)))
-                if value != None:
-                    return Field.quote(str(value))
-            if self.ctype == Type.CHAR:
-                if isinstance(value, str):
-                    if self.is_padded and self.is_padded != 'R':
-                        return Field.quote(self._pad(value))
                     else:
-                        return Field.quote(value)
+                        return Field.quote(str(value))
         if self.ftype == Type.DATE:
             if isinstance(value, str):
                 return Field.isotod(value)
