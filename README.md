@@ -1,4 +1,4 @@
-# RFKAdapter 0.3.2
+# RFKAdapter 0.3.3
 
 RFKAdapter enables easy access to local legacy xBase (DBF) *databases* originally used by dBase, Clipper, FoxPro etc. It includes a native Harbour adapter component for data *table* access and full support for index updating. MEMO fields are skipped, this can be fixed.
 ***
