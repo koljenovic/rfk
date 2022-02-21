@@ -52,6 +52,9 @@ class HarbourError(Exception):
 class FileError(Exception):
     pass
 
+class EnvError(Exception):
+    pass
+
 class Type:
     NULL = ord('?') # no type inferrence has been attempted
     UNDEFINED = ord('X') # type inferrence failed
@@ -228,9 +231,26 @@ class DBFIterator:
             raise StopIteration
 
 _EXE = 'dbfadapter'
+_REINDEXE = 'dbfreindex'
 
 class DBFAdapter:
     def __init__(self, db_path, table_name, code_page, mode='-', index_suffix='ntx'):
+        envpath = os.getenv('PATH').split(':')
+        exe_present = False
+        reindexe_present = False
+        for pathdir in envpath:
+            exe_path = pathdir + '/' + _EXE
+            reindexe_path = pathdir + '/' + _REINDEXE
+            if os.path.exists(exe_path):
+                if os.access(exe_path, os.X_OK):
+                    exe_present = True
+            if os.path.exists(reindexe_path):
+                if os.access(reindexe_path, os.X_OK):
+                    reindexe_present = True
+            if exe_present and reindexe_present:
+                break
+        if not exe_present or not reindexe_present:
+            raise EnvError('dbfadapter and/or dbfreindex not in PATH and/or not executable. Aborting!')
         if os.path.isfile(db_path + table_name):
             self._table = self
             self.db_path = db_path
@@ -324,6 +344,13 @@ class DBFAdapter:
             if fname:
                 os.remove(fname)
         return int(updated_count)
+
+    @staticmethod
+    def _reindex(db_path, table_name, index_files, code_page, _REINDEXE=_REINDEXE):
+        ext = subprocess.run([_REINDEXE, db_path, table_name, *index_files, '//noalert'], timeout=10, text=True, capture_output=True)
+        if ext.returncode != 0:
+            raise HarbourError(ext.stderr)
+        return True
 
     def _locate_index_files(self):
         """Finds index files for db if they exist, **VERY MUCH** case sensitive"""
@@ -604,6 +631,9 @@ class RFKAdapter(DBFAdapter):
                 raise FieldError('No field with name %s in table %s to update' % (field_name, self.table_name))
             _what[field_name] = self.header_fields[field_name].ctof(new_value)
         return DBFAdapter._update({'what': _what, 'where': _dict_where}, self.db_path, self.table_name, self.index_files, code_page=self.code_page)
+
+    def reindex(self):
+        return DBFAdapter._reindex(self.db_path, self.table_name, self.index_files, code_page=self.code_page)
 
     def _cache_headers(self):
         """Caches parsed headers to file because parsing is time demanding

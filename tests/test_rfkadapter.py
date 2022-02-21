@@ -20,8 +20,11 @@ import rfkadapter
 import json
 import secrets
 import unittest
+import hashlib
+import binascii
+
 from datetime import datetime, date
-from rfkadapter import DBFAdapter, RFKAdapter, Field, Type, FieldError, _EXE
+from rfkadapter import DBFAdapter, RFKAdapter, Field, Type, FieldError, _EXE, HarbourError
 from unittest import TestCase
 
 class DBFAdapterTest(TestCase):
@@ -76,6 +79,44 @@ class DBFAdapterTest(TestCase):
             package = json.load(f)
             outcome = DBFAdapter._update(package, self._db_path, 'ULIZ.DBF', ['ULIZ01', 'ULIZ02', 'ULIZ03'], 'cp852')
             self.assertEqual(outcome > 0, True)
+
+    def test_reindex_fail(self):
+        fail_path = os.path.dirname(os.path.realpath(__file__)) + '/data/index/fail/'
+        with self.assertRaises(HarbourError):
+            DBFAdapter._reindex(fail_path, 'ULIZ.DBF', ['ULIZ01.NTX', 'ULIZ02.NTX', 'ULIZ03.NTX'], 'cp852')
+
+    def test_reindex(self):
+        index_path = os.path.dirname(os.path.realpath(__file__)) + '/data/index/'
+        DBFAdapter._reindex(index_path, 'ULIZ.DBF', ['ULIZ01.NTX', 'ULIZ02.NTX', 'ULIZ03.NTX'], 'cp852')
+        clock = str(os.path.getmtime(index_path + 'ULIZ.DBF'))[:9]
+        indices = {'ULIZ01.NTX': {}, 'ULIZ02.NTX': {}, 'ULIZ03.NTX': {}}
+        for index in indices:
+            indices[index]['size'] = os.path.getsize(index_path + index)
+            # print('Size', index, indices[index]['size'], 'bytes')
+            # NOTE: intentionally aims to corrupt the index
+            if indices[index]['size'] > 0:
+                init_digest256 = secrets.randbelow(2**64)
+                end_digest256 = secrets.randbelow(2**64)
+                with open(index_path + index, 'r+b') as fp:
+                    ifh256 = hashlib.sha256()
+                    ifh256.update(fp.read())
+                    init_digest256 = binascii.hexlify(ifh256.digest())
+                    indices[index]['hash'] = init_digest256
+                    # print(indices[index]['hash'])
+                    for _ in range(256):
+                        address = secrets.randbelow(indices[index]['size'])
+                        # NOTE: messing the headers up makes indices unrecoverable!
+                        if address > 1024:
+                            fp.seek(address)
+                            fp.write(secrets.randbelow(256).to_bytes(1, byteorder='big'))
+                outcome = DBFAdapter._reindex(index_path, 'ULIZ.DBF', ['ULIZ01.NTX', 'ULIZ02.NTX', 'ULIZ03.NTX'], 'cp852')
+                self.assertEqual(outcome, True)
+                with open(index_path + index, 'rb') as fp:
+                    efh256 = hashlib.sha256()
+                    fp.seek(0)
+                    efh256.update(fp.read())
+                    end_digest256 = binascii.hexlify(efh256.digest())
+                self.assertEqual(init_digest256, end_digest256)
 
 class RFKAdapterTest(TestCase):
     def __init__(self, *args, **kwds):
@@ -690,6 +731,10 @@ class RFKAdapterTest(TestCase):
         mock_field = self._adapter.header_fields['MIS_ULI']
         outcome = mock_field.ctox(None)
         self.assertEqual(outcome, '""')
+
+    def test_reindex(self):
+        self._set_up()
+        self.assertEqual(self._adapter.reindex(), True)
 
 if __name__ == '__main__':
     unittest.main(failfast=True)
