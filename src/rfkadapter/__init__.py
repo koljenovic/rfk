@@ -1,1 +1,1 @@
-from .rfkadapter import DBFAdapter, RFKAdapter, Field, Type, FieldError, HarbourError, _EXE
+from .rfkadapter import DBFAdapter, RFKAdapter, Field, Type, FieldError, HarbourError, FileError, EnvError, MetaRecord, DBFIterator, _EXE, _REINDEXE
