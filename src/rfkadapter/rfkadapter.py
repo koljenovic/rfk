@@ -347,7 +347,7 @@ class DBFAdapter:
 
     @staticmethod
     def _reindex(db_path, table_name, index_files, code_page, _REINDEXE=_REINDEXE):
-        ext = subprocess.run([_REINDEXE, db_path, table_name, *index_files, '//noalert'], timeout=10, text=True, capture_output=True)
+        ext = subprocess.run([_REINDEXE, db_path, table_name, code_page, *index_files, '//noalert'], timeout=10, text=True, capture_output=True)
         if ext.returncode != 0:
             raise HarbourError(ext.stderr)
         return True

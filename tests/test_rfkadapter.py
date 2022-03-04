@@ -83,11 +83,11 @@ class DBFAdapterTest(TestCase):
     def test_reindex_fail(self):
         fail_path = os.path.dirname(os.path.realpath(__file__)) + '/data/index/fail/'
         with self.assertRaises(HarbourError):
-            DBFAdapter._reindex(fail_path, 'ULIZ.DBF', ['ULIZ01.NTX', 'ULIZ02.NTX', 'ULIZ03.NTX'], 'cp852')
+            DBFAdapter._reindex(fail_path, 'ULIZ.DBF', ['ULIZ01.NTX', 'ULIZ02.NTX', 'ULIZ03.NTX'], 'HR852')
 
     def test_reindex(self):
         index_path = os.path.dirname(os.path.realpath(__file__)) + '/data/index/'
-        DBFAdapter._reindex(index_path, 'ULIZ.DBF', ['ULIZ01.NTX', 'ULIZ02.NTX', 'ULIZ03.NTX'], 'cp852')
+        DBFAdapter._reindex(index_path, 'ULIZ.DBF', ['ULIZ01.NTX', 'ULIZ02.NTX', 'ULIZ03.NTX'], 'HR852')
         clock = str(os.path.getmtime(index_path + 'ULIZ.DBF'))[:9]
         indices = {'ULIZ01.NTX': {}, 'ULIZ02.NTX': {}, 'ULIZ03.NTX': {}}
         for index in indices:
@@ -109,7 +109,7 @@ class DBFAdapterTest(TestCase):
                         if address > 1024:
                             fp.seek(address)
                             fp.write(secrets.randbelow(256).to_bytes(1, byteorder='big'))
-                outcome = DBFAdapter._reindex(index_path, 'ULIZ.DBF', ['ULIZ01.NTX', 'ULIZ02.NTX', 'ULIZ03.NTX'], 'cp852')
+                outcome = DBFAdapter._reindex(index_path, 'ULIZ.DBF', ['ULIZ01.NTX', 'ULIZ02.NTX', 'ULIZ03.NTX'], 'HR852')
                 self.assertEqual(outcome, True)
                 with open(index_path + index, 'rb') as fp:
                     efh256 = hashlib.sha256()

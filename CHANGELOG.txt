@@ -1,3 +1,13 @@
+0.3.5
+- import * in rfkadapter
+- dbfreindex code page support
+
+0.3.4
+- reindex support added to RFKAdapter
+
+0.3.3
+- ctox export charint padding fix
+
 0.3.2
 - text encoding support
 - bug fixes
