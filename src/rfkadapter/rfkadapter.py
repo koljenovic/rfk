@@ -55,6 +55,9 @@ class FileError(Exception):
 class EnvError(Exception):
     pass
 
+class UnsupportedEncodingError(Exception):
+    pass
+
 class Type:
     NULL = ord('?') # no type inferrence has been attempted
     UNDEFINED = ord('X') # type inferrence failed
@@ -260,9 +263,175 @@ class DBFAdapter:
             self._records = None
             self._meta = None
             self._filter = []
-            self.code_page = code_page
+            self.code_page = DBFAdapter.resolve_code_page(code_page)
         else:
             raise FileError('No such database exists.')
+
+    @staticmethod
+    def _py2hb_codepage(pycp):
+        mapper = {
+            'ascii': 'EN',
+            'cp1125': 'UA1125',
+            'cp1250': 'HRWIN',
+            'cp1251': 'SRWIN',
+            'cp1252': 'DEWIN',
+            'cp1253': 'ELWIN',
+            'cp1254': 'TRWIN',
+            'cp1255': 'HEWIN',
+            'cp1257': 'EEWIN',
+            'cp437': 'EL437',
+            'cp737': 'EL737',
+            'cp775': 'EE775',
+            'cp850': 'DE850',
+            'cp852': 'HR852',
+            'cp857': 'TR857',
+            'cp858': 'DE858',
+            'cp860': 'PT860',
+            'cp861': 'IS861',
+            'cp862': 'HE862',
+            'cp865': 'DK865',
+            'cp866': 'UA866',
+            'iso8859-1': 'DEISO',
+            'iso8859-15': 'SVISO',
+            'iso8859-2': 'HRISO',
+            'iso8859-5': 'BGISO',
+            'iso8859-7': 'ELISO',
+            'iso8859-9': 'TRISO',
+            'iso8859_1': 'DEISO',
+            'iso8859_15': 'SVISO',
+            'iso8859_2': 'HRISO',
+            'iso8859_5': 'BGISO',
+            'iso8859_7': 'ELISO',
+            'iso8859_9': 'TRISO',
+            'koi8_r': 'RUKOI8',
+            'koi8_u': 'UAKOI8',
+            'utf_16_le': 'UTF16LE',
+            'utf_8': 'UTF8',
+            'utf_8': 'UTF8EX',
+        }
+        if pycp in mapper and mapper[pycp]:
+            return mapper[pycp]
+        else:
+            return None
+
+    @staticmethod
+    def _hb2py_codepage(hbcp):
+        mapper = {
+            'EN': 'ascii',
+            'UTF8': 'utf_8',
+            'HR852': 'cp852',
+            'BG866': 'cp866',
+            'BGISO': 'iso8859-5',
+            'BGMIK': None,
+            'BGWIN': 'cp1251',
+            'CS852': 'cp852',
+            'CS852C': 'cp852',
+            'CSISO': 'iso8859-2',
+            'CSKAMC': None,
+            'CSWIN': 'cp1250',
+            'DE850': 'cp850',
+            'DE850M': 'cp850',
+            'DE858': 'cp858',
+            'DEISO': 'iso8859-1',
+            'DEWIN': 'cp1252',
+            'DK865': 'cp865',
+            'EE775': 'cp775',
+            'EEWIN': 'cp1257',
+            'EL437': 'cp437',
+            'EL737': 'cp737',
+            'ELISO': 'iso8859-7',
+            'ELWIN': 'cp1253',
+            'ES850': 'cp850',
+            'ES850C': 'cp850',
+            'ES850M': 'cp850',
+            'ESISO': 'iso8859-1',
+            'ESMWIN': 'iso8859-1',
+            'ESWIN': 'cp1252',
+            'FI850': 'cp850',
+            'FR850': 'cp850',
+            'FR850C': 'cp850',
+            'FR850M': 'cp850',
+            'FRISO': 'iso8859-1',
+            'FRWIN': 'cp1252',
+            'HE862': 'cp862',
+            'HEWIN': 'cp1255',
+            'HR646': 'ascii',
+            'HRISO': 'iso8859-2',
+            'HRWIN': 'cp1250',
+            'HU852': 'cp852',
+            'HU852C': 'cp852',
+            'HUISO': 'iso8859-2',
+            'HUWIN': 'cp1250',
+            'IS850': 'cp850',
+            'IS861': 'cp861',
+            'IT437': 'cp437',
+            'IT850': 'cp850',
+            'IT850M': 'cp850',
+            'ITISB': 'iso8859-1',
+            'ITISO': 'iso8859-1',
+            'ITWIN': 'cp1252',
+            'LT775': 'cp775',
+            'LTWIN': 'cp1257',
+            'LV775': 'cp775',
+            'LVWIN': 'cp1257',
+            'NL850': 'cp850',
+            'NL850M': 'cp850',
+            'NO865': 'cp865',
+            'PL852': 'cp852',
+            'PLISO': 'iso8859-2',
+            'PLMAZ': None,
+            'PLWIN': 'cp1250',
+            'PT850': 'cp850',
+            'PT860': 'cp860',
+            'PTISO': 'iso8859-1',
+            'RO852': 'cp852',
+            'ROISO': 'iso8859-2',
+            'ROWIN': 'cp1250',
+            'RU1251': 'cp1251',
+            'RU866': 'cp866',
+            'RUISO': 'iso8859-5',
+            'RUKOI8': 'koi8_r',
+            'SK852': 'cp852',
+            'SK852C': 'cp852',
+            'SKISO': 'iso8859-2',
+            'SKKAMC': None,
+            'SKWIN': 'cp1250',
+            'SL646': 'ascii',
+            'SL852': 'cp852',
+            'SLISO': 'iso8859-2',
+            'SLWIN': 'cp1250',
+            'SR646': 'ascii',
+            'SR646C': 'ascii',
+            'SRWIN': 'cp1251',
+            'SV437C': 'cp437',
+            'SV850': 'cp850',
+            'SV850M': 'cp850',
+            'SVISO': 'iso8859-15',
+            'SVWIN': 'iso8859-1',
+            'TR857': 'cp857',
+            'TRISO': 'iso8859-9',
+            'TRWIN': 'cp1254',
+            'UA1125': 'cp1125',
+            'UA1251': 'cp1251',
+            'UA866': 'cp866',
+            'UAKOI8': 'koi8_u',
+            'UTF16LE': 'utf_16_le',
+            'UTF8EX': 'utf_8',
+        }
+        if hbcp in mapper and mapper[hbcp]:
+            return mapper[hbcp]
+        else:
+            return None
+
+    def resolve_code_page(cp):
+        ''' Harbour code page naming should be used at all times '''
+        pycp = DBFAdapter._hb2py_codepage(cp)
+        if pycp:
+            return cp
+        hbcp = DBFAdapter._py2hb_codepage(cp)
+        if hbcp:
+            return hbcp
+        raise UnsupportedEncodingError(f'{cp} ENCODING NOT SUPPORTED!')
 
     @staticmethod
     def _head(db_path, table_name, code_page, _EXE=_EXE):
@@ -273,7 +442,7 @@ class DBFAdapter:
             ext = subprocess.run([_EXE, "head", db_path, table_name, fname, '//noalert'], timeout=10, text=True, capture_output=True)
             if ext.returncode != 0:
                 raise HarbourError(ext.stderr)
-            f = os.fdopen(fd, 'r', encoding=code_page)
+            f = os.fdopen(fd, 'r', encoding=DBFAdapter._hb2py_codepage(code_page))
             headers = f.read()
         finally:
             if f:
@@ -288,13 +457,13 @@ class DBFAdapter:
         records, f, fd, fname = [], None, None, None
         try:
             fd, fname = tempfile.mkstemp(prefix='dbfx', suffix='.cson', text=True)
-            with open(fname, 'w', encoding=code_page) as f:
+            with open(fname, 'w', encoding=DBFAdapter._hb2py_codepage(code_page)) as f:
                 json.dump(where, f)
             os.close(fd)
             ext = subprocess.run([_EXE, "export", db_path, table_name, fname, *index_files, '//noalert'], timeout=10, text=True, capture_output=True)
             if ext.returncode != 0:
                 raise HarbourError(ext.stderr)
-            with open(fname, 'r', encoding=code_page) as f:
+            with open(fname, 'r', encoding=DBFAdapter._hb2py_codepage(code_page)) as f:
                 csvf = csv.reader(f)
                 records = [r for r in csvf]
         finally:
@@ -310,7 +479,7 @@ class DBFAdapter:
         f, fd, fname = None, None, None
         try:
             fd, fname = tempfile.mkstemp(prefix='dbfa', suffix='.csv', text=True)
-            f = os.fdopen(fd, 'w', encoding=code_page)
+            f = os.fdopen(fd, 'w', encoding=DBFAdapter._hb2py_codepage(code_page))
             f.write(','.join(line))
             f.close()
             ext = subprocess.run([_EXE, "append", db_path, table_name, fname, *index_files, '//noalert'], timeout=10, text=True, capture_output=True)
@@ -329,7 +498,7 @@ class DBFAdapter:
         f, fd, fname, updated_count = None, None, None, None
         try:
             fd, fname = tempfile.mkstemp(prefix='dbfu', suffix='.json', text=True)
-            f = os.fdopen(fd, 'w', encoding=code_page)
+            f = os.fdopen(fd, 'w', encoding=DBFAdapter._hb2py_codepage(code_page))
             data = json.dump(update_package, f)
             f.close()
             ext = subprocess.run([_EXE, "update", db_path, table_name, fname, *index_files, '//noalert'], timeout=10, text=True, capture_output=True)
