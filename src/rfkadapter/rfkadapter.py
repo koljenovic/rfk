@@ -530,7 +530,7 @@ class DBFAdapter:
                     if e.name.startswith(self.table_name.split('.')[0]):
                         if e.name.lower().endswith('.' + self.index_suffix.lower()):
                             indices.append(e.name.split('.')[0])
-        return indices
+        return sorted(indices)
 
     def _parse_meta(self):
         header = json.loads(DBFAdapter._head(self.db_path, self.table_name, code_page=self.code_page))

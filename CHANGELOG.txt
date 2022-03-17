@@ -1,3 +1,6 @@
+0.3.7 - IN_PROGRESS
+- indices arbitrary sorting error fixed
+
 0.3.6
 - this is basically 0.3.5 with errors fixed
 - had to increment version number
