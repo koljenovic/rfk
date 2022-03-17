@@ -57,6 +57,15 @@ class DBFAdapterTest(TestCase):
         self.assertEqual('ULIZ02' in self._adapter.index_files, True)
         self.assertEqual('ULIZ03' in self._adapter.index_files, True)
 
+    def test_indices_are_sorted(self):
+        """tests whether index files get returned in sorted order"""
+        self._set_up('PROM.DBF')
+        self.assertNotEqual(self._adapter.index_files, [])
+        self.assertEqual(self._adapter.index_files, sorted(self._adapter.index_files))
+        self._set_up('ROBA.DBF')
+        self.assertNotEqual(self._adapter.index_files, [])
+        self.assertEqual(self._adapter.index_files, sorted(self._adapter.index_files))
+
     def test_parse_memo(self):
         self._set_up()
         target = {'OBJ_ULI': ('OBJ_ULI', 67, 3, 0), 'DOK_ULI': ('DOK_ULI', 67, 2, 0), 'SIF_ULI': ('SIF_ULI', 67, 5, 0), 'GOT_ULI': ('GOT_ULI', 67, 1, 0), 'NAL_ULI': ('NAL_ULI', 67, 3, 0), 'DAT_ULI': ('DAT_ULI', 68, 8, 0), 'OTP_ULI': ('OTP_ULI', 67, 20, 0), 'NAO_ULI': ('NAO_ULI', 67, 50, 0), 'DAI_ULI': ('DAI_ULI', 68, 8, 0), 'MIS_ULI': ('MIS_ULI', 67, 50, 0), 'VAL_ULI': ('VAL_ULI', 68, 8, 0), 'DAN_ULI': ('DAN_ULI', 78, 3, 0), 'RBR_ULI': ('RBR_ULI', 78, 4, 0), 'KUF_ULI': ('KUF_ULI', 67, 10, 0), 'ZAD_ULI': ('ZAD_ULI', 67, 3, 0), 'PAR_ULI': ('PAR_ULI', 67, 7, 0), 'PRO_ULI': ('PRO_ULI', 67, 3, 0), 'TRG_ULI': ('TRG_ULI', 67, 3, 0), 'KAS_ULI': ('KAS_ULI', 78, 5, 2), 'PUT_ULI': ('PUT_ULI', 67, 3, 0), 'NAP_ULI': ('NAP_ULI', 77, 10, 0), 'LIK_ULI': ('LIK_ULI', 76, 1, 0), 'FIN_ULI': ('FIN_ULI', 76, 1, 0), 'L0_ULI': ('L0_ULI', 76, 1, 0), 'L1_ULI': ('L1_ULI', 76, 1, 0), 'L2_ULI': ('L2_ULI', 76, 1, 0), 'L3_ULI': ('L3_ULI', 76, 1, 0), 'L4_ULI': ('L4_ULI', 76, 1, 0), 'L5_ULI': ('L5_ULI', 76, 1, 0), 'L6_ULI': ('L6_ULI', 76, 1, 0), 'L7_ULI': ('L7_ULI', 76, 1, 0), 'L8_ULI': ('L8_ULI', 76, 1, 0), 'L9_ULI': ('L9_ULI', 76, 1, 0), 'L1A_ULI': ('L1A_ULI', 76, 1, 0), 'L2A_ULI': ('L2A_ULI', 76, 1, 0), 'L3A_ULI': ('L3A_ULI', 76, 1, 0), 'L4A_ULI': ('L4A_ULI', 76, 1, 0), 'L5A_ULI': ('L5A_ULI', 76, 1, 0), 'N1_ULI': ('N1_ULI', 78, 1, 0), 'N2_ULI': ('N2_ULI', 78, 1, 0), 'FIS_ULI': ('FIS_ULI', 76, 1, 0), 'REK_ULI': ('REK_ULI', 76, 1, 0), 'STO_ULI': ('STO_ULI', 76, 1, 0), 'FRA_ULI': ('FRA_ULI', 67, 6, 0), 'FRR_ULI': ('FRR_ULI', 67, 6, 0), 'MJE_ULI': ('MJE_ULI', 67, 2, 0), 'PAS_ULI': ('PAS_ULI', 67, 10, 0), 'DAS_ULI': ('DAS_ULI', 68, 8, 0), 'MTR_ULI': ('MTR_ULI', 67, 7, 0)}
