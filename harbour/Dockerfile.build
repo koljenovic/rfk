@@ -1,0 +1,14 @@
+FROM harbour:latest
+
+RUN mkdir -p /opt/rfk
+
+WORKDIR /opt/rfk
+
+COPY dbfadapter.prg .
+COPY dbfreindex.prg .
+COPY build .
+RUN chmod +x build
+
+ENV HB_INS="/opt/harbour/core"
+RUN ./build dbfadapter
+RUN ./build dbfreindex

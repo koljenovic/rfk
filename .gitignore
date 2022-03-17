@@ -1,8 +1,9 @@
 /tests/data/*
 /harbour/*
 !/harbour/*.prg
-!/harbour/build
+!/harbour/build*
 !/harbour/README.md
+!/harbour/Dockerfile*
 
 ### Python ###
 # Byte-compiled / optimized / DLL files

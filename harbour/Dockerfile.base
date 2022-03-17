@@ -1,0 +1,20 @@
+# Generic harbour environment based off of Debian Bullseye
+
+FROM debian:bullseye
+
+RUN apt update && apt install -y apt-utils
+
+
+RUN apt install -y bash make git gcc binutils liballegro4-dev libncurses-dev libslang2-dev libx11-dev libcairo2-dev libgpm-dev librabbitmq-dev libcurl4-openssl-dev default-libmysqlclient-dev libssl-dev libcups2-dev firebird-dev libfreeimage-dev libgd-dev libgs-dev libmagic-dev unixodbc-dev libpq-dev libicu-dev libbz2-dev zlib1g-dev libsqlite3-dev libexpat1-dev
+
+RUN mkdir -p /opt/harbour
+
+WORKDIR /opt/harbour
+
+RUN git clone --depth 1 https://github.com/harbour/core
+
+ENV HB_WITH_CURL=/usr/include/x86_64-linux-gnu/
+RUN cd core && make -j 8 install
+
+RUN ./core/bin/linux/gcc/hbtest
+RUN hbtest

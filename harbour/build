@@ -1,6 +1,5 @@
 #!/bin/bash
-HB_INS="./core"
-$HB_INS/bin/linux/gcc/harbour $1.prg -n -q0 -es2 -gc0 -I$HB_INS/include
+"${HB_INS:=./core}"/bin/linux/gcc/harbour $1.prg -n -q0 -es2 -gc0 -I$HB_INS/include
 gcc -I. -I$HB_INS/include -Wall -c $1.c -o$1.o
 gcc -static -Wall -o$1 $1.o -L $HB_INS/lib/linux/gcc/ \
       -Wl,--start-group -lpthread -lbz2 -lhbcomm -lhbmacro -llzf -lgtalleg \
@@ -10,7 +9,7 @@ gcc -static -Wall -o$1 $1.o -L $HB_INS/lib/linux/gcc/ \
       -lgtstd -lhbexpat -lhbnetio -lhbtpathy -lrddcdx -lgttrm -lhbextern \
       -lhbnf -lhbuddall -lrddfpt -lgtxwc -lhbformat -lhbunix -lhbsqlit3 \
       -lrddnsx -lhbfoxpro -lhbusrrdd -lrddntx -lhbfship -lhboslib \
-      -lhbvm -lrddsql -lhbgt -lhbpcre -lhbvmmt -lsddsqlt3 -lhbamf -lhbgzio \
+      -lhbvm -lrddsql -lhbgt -lhbvmmt -lsddsqlt3 -lhbamf -lhbgzio \
       -lhbpipeio -lhbxdiff -ltiff -lhbblink -lhbhpdf -lhbpp -lhbxpp -ltinymt \
       -lhbbz2 -lhbhsx -lhbrdd -lhbzebra -lxdiff -lhbbz2io -lhbhttpd -lhbrtl \
       -lhbziparc -lxhb -lhbcairo -lhblang -lhbsix -ljpeg -lhbcomio -lhblzf \
