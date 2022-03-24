@@ -1,5 +1,7 @@
 0.3.7 - IN_PROGRESS
 - indices arbitrary sorting error fixed
+- changed building process to multistage docker
+- rfkadapter build script added
 
 0.3.6
 - this is basically 0.3.5 with errors fixed
